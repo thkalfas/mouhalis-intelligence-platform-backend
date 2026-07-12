@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+
+# Local runtime state (Path B local backend, cost-ledger buffer, staging)
+data/staging/
+data/*.json
+*.local.json
+
+# Secrets — never commit
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db

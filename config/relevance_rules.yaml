@@ -1,0 +1,32 @@
+# Deterministic relevance rules (AD-8, FR-7). Evaluated BEFORE the LLM classifier.
+# Kept separate from ontology.yaml because these change more often (spec §7.3).
+# KAD codes for this client (spec §7.3):
+kad_codes: ["46.35", "46.37", "46.38", "56.10", "56.30"]
+
+rules:
+  # --- Explicit include (auto Class A) ---
+  - rule_id: kad_direct_mention
+    action: classify_A
+    when:
+      text_contains_kad_any: ["46.35", "46.37", "46.38", "56.10", "56.30"]
+
+  - rule_id: high_priority_topic_hit
+    action: classify_A
+    when:
+      topics_contains_any:
+        - tobacco_traceability
+        - tobacco_excise
+        - food_labeling
+        - food_recall
+        - vertical_agreements
+
+  # --- Explicit exclude (auto Class B) ---
+  - rule_id: unrelated_sectors
+    action: classify_B
+    when:
+      topics_all_in:
+        - forestry
+        - military
+        - maritime
+        - religious_affairs
+        - urban_planning_non_retail

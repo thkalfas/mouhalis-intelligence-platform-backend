@@ -1,0 +1,85 @@
+# Source registry (AD-8). tier, endpoint, cadence, authority_rank (lower = more
+# authoritative, used as the dedup merge tie-breaker — AD-8 / L1 fix).
+# Phase 0 enables only the FakeSource; real adapters flip `enabled: true` in Epic 1+.
+sources:
+  - name: FakeSource
+    tier: 1
+    endpoint: "memory://fixtures"
+    cadence: "30m"
+    authority_rank: 1
+    enabled: true
+    adapter: fake
+
+  # --- Tier 1 (official) — authority_rank 1 ---
+  - name: EUR-Lex
+    tier: 1
+    endpoint: "http://publications.europa.eu/webapi/rdf/sparql"
+    cadence: "30m"
+    authority_rank: 1
+    enabled: false
+  - name: Διαύγεια
+    tier: 1
+    endpoint: "https://diavgeia.gov.gr/opendata"
+    cadence: "6h"
+    authority_rank: 1
+    enabled: false
+  - name: Βουλή
+    tier: 1
+    endpoint: "https://www.hellenicparliament.gr/api.ashx"
+    cadence: "daily@08:00"
+    authority_rank: 1
+    enabled: false
+  - name: EDPB
+    tier: 1
+    endpoint: "https://www.edpb.europa.eu/rss/documents_en.rss"
+    cadence: "daily@09:00"
+    authority_rank: 1
+    enabled: false
+  - name: EFSA
+    tier: 1
+    endpoint: "https://www.efsa.europa.eu/en/rss/all"
+    cadence: "daily@09:00"
+    authority_rank: 1
+    enabled: false
+  - name: GDPRhub
+    tier: 1
+    endpoint: "https://gdprhub.eu/api.php"
+    cadence: "daily@10:00"
+    authority_rank: 2
+    enabled: false
+
+  # --- Tier 2 (scraping) — authority_rank 1 (official sites) ---
+  - name: ΦΕΚ
+    tier: 2
+    endpoint: "https://search.et.gr/en/"
+    cadence: "12h"
+    authority_rank: 1
+    enabled: false
+  - name: ΕΦΕΤ
+    tier: 2
+    endpoint: "https://www.efet.gr"
+    cadence: "4h"
+    authority_rank: 1
+    enabled: false
+  - name: RASFF
+    tier: 2
+    endpoint: "https://webgate.ec.europa.eu/rasff-window/screen/list"
+    cadence: "4h"
+    authority_rank: 1
+    enabled: false
+
+  # --- Official aggregators — authority_rank 2 ---
+  - name: kodiko.gr
+    tier: 3
+    endpoint: "https://www.kodiko.gr"
+    cadence: "daily@11:00"
+    authority_rank: 2
+    enabled: false
+
+  # --- Commercial aggregators — authority_rank 3 ---
+  - name: taxheaven.gr
+    tier: 3
+    endpoint: "https://www.taxheaven.gr"
+    cadence: "daily@11:00"
+    authority_rank: 3
+    enabled: false

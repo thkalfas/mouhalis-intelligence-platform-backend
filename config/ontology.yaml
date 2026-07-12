@@ -1,0 +1,60 @@
+# Compliance topic ontology (AD-8). CLIENT DELIVERABLE — this is a DRAFT subset
+# for Phase 0; the full ontology is validated by the legal team in a 90' workshop
+# before production tagging (PRD §4.3 note, R4). Topics assigned to Items are
+# drawn ONLY from this list — an unrecognized token never creates a Topic.
+topics:
+  - topic_id: tobacco_traceability
+    name_gr: "Ιχνηλασιμότητα καπνικών"
+    name_en: "Tobacco traceability"
+    domain: tobacco
+    keywords_gr: ["ιχνηλασιμότητα", "ΕΚΜΕΑ", "ένσημες ταινίες"]
+    keywords_en: ["tobacco traceability", "track and trace"]
+    priority: high
+
+  - topic_id: tobacco_excise
+    name_gr: "ΕΦΚ καπνικών"
+    name_en: "Tobacco excise duty"
+    domain: tobacco
+    keywords_gr: ["ειδικός φόρος κατανάλωσης", "ΕΦΚ καπνού"]
+    keywords_en: ["excise duty tobacco"]
+    priority: high
+
+  - topic_id: food_labeling
+    name_gr: "Επισήμανση τροφίμων"
+    name_en: "Food labeling"
+    domain: food
+    keywords_gr: ["επισήμανση τροφίμων", "αλλεργιογόνα", "διατροφική δήλωση"]
+    keywords_en: ["food labelling", "allergen labelling"]
+    priority: high
+
+  - topic_id: food_recall
+    name_gr: "Ανακλήσεις τροφίμων"
+    name_en: "Food recall"
+    domain: food
+    keywords_gr: ["ανάκληση τροφίμου", "ανάκληση προϊόντος", "listeria", "σαλμονέλα"]
+    keywords_en: ["food recall", "rasff"]
+    priority: high
+
+  - topic_id: vertical_agreements
+    name_gr: "Κάθετες συμφωνίες"
+    name_en: "Vertical agreements"
+    domain: competition
+    keywords_gr: ["κάθετη συμφωνία", "δίκτυο διανομής", "franchise", "αποκλειστική διανομή"]
+    keywords_en: ["vertical agreement", "selective distribution"]
+    priority: high
+
+  - topic_id: gdpr_direct_marketing
+    name_gr: "GDPR — απευθείας εμπορική προώθηση"
+    name_en: "GDPR direct marketing"
+    domain: data_protection
+    keywords_gr: ["απευθείας εμπορική προώθηση", "telemarketing", "spam"]
+    keywords_en: ["direct marketing", "telemarketing"]
+    priority: medium
+
+  - topic_id: csrd_scope
+    name_gr: "CSRD — πεδίο εφαρμογής"
+    name_en: "CSRD scope"
+    domain: esg
+    keywords_gr: ["CSRD", "μη χρηματοοικονομική αναφορά", "βιωσιμότητα"]
+    keywords_en: ["CSRD", "sustainability reporting"]
+    priority: high
