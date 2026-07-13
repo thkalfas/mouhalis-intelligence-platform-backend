@@ -151,6 +151,11 @@ class Item(BaseModel):
     class_reasoning: Optional[ClassReasoning] = None  # Env-B contract (AD-11)
     confidence_score: Optional[float] = None  # triage classifier only
     dedup_score: Optional[float] = None  # dedup only
+    # Triage classifier structured signals (Story 6.2). Populated only by the LLM
+    # classifier path; used by review SLAs (action_signal) and routing.
+    sector_touchpoints: list[str] = Field(default_factory=list)
+    action_signal: Optional[str] = None  # immediate | monitor | none
+    specialist_needed: Optional[bool] = None
     url: str = ""
     collected_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)

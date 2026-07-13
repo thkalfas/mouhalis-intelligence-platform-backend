@@ -16,7 +16,10 @@ from ..core.models import ClassReasoning, ContentClass, DecidedBy, Item
 _CLASSIFIER_SYSTEM = (
     "You are a legal relevance classifier for a wholesale tobacco/food + "
     "franchised retail food-service business (KAD 46.35, 46.37, 46.38, 56.10, "
-    "56.30) in Greece + EU. Return JSON with relevance/confidence/reasoning."
+    "56.30) in Greece + EU. Return JSON with keys: relevance (high|medium|low), "
+    "confidence (0..1), reasoning (Greek, 2-3 sentences), sector_touchpoints "
+    "(array), action_signal (immediate|monitor|none), specialist_needed (bool). "
+    "Prefer 'medium' over guessing when uncertain."
 )
 
 
@@ -82,10 +85,18 @@ def triage(item: Item, cfg: AppConfig, llm: MeteredLLMClient) -> Item:
     relevance = verdict.get("relevance", "medium")
     confidence = float(verdict.get("confidence", 0.5))
     item.confidence_score = confidence
+    # Capture the classifier's structured signals (Story 6.2) for downstream
+    # routing and review SLAs (action_signal drives the WF2 24h fast-track).
+    touchpoints = verdict.get("sector_touchpoints") or []
+    item.sector_touchpoints = [str(t) for t in touchpoints] if isinstance(touchpoints, list) else []
+    item.action_signal = verdict.get("action_signal")
+    if "specialist_needed" in verdict:
+        item.specialist_needed = bool(verdict["specialist_needed"])
 
-    if relevance == "high" and confidence > 0.85:
+    threshold = cfg.triage.high_confidence
+    if relevance == "high" and confidence > threshold:
         item.content_class = ContentClass.A
-    elif relevance == "low" and confidence > 0.85:
+    elif relevance == "low" and confidence > threshold:
         item.content_class = ContentClass.B
     else:
         item.content_class = ContentClass.C

@@ -42,9 +42,13 @@ def phase0_responder(stage: str, prompt: str) -> str:
     if stage == "relevance_classify":
         if "ναυτ" in p or "maritime" in p or "λιμ" in p:
             return json.dumps({"relevance": "low", "confidence": 0.95,
-                               "reasoning": "Αφορά ναυτιλιακά/λιμενικά — εκτός πεδίου δραστηριότητας."})
+                               "reasoning": "Αφορά ναυτιλιακά/λιμενικά — εκτός πεδίου δραστηριότητας.",
+                               "sector_touchpoints": ["none"], "action_signal": "none",
+                               "specialist_needed": False})
         return json.dumps({"relevance": "medium", "confidence": 0.6,
-                           "reasoning": "Πιθανή σχετικότητα με επισήμανση προϊόντων — χρειάζεται ανθρώπινη κρίση."})
+                           "reasoning": "Πιθανή σχετικότητα με επισήμανση προϊόντων — χρειάζεται ανθρώπινη κρίση.",
+                           "sector_touchpoints": ["food_wholesale"], "action_signal": "monitor",
+                           "specialist_needed": False})
     if stage == "interpretation":
         return json.dumps({
             "summary": "Νέες υποχρεώσεις που ενδέχεται να επηρεάζουν τη δραστηριότητα του πελάτη.",

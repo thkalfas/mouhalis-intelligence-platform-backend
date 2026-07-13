@@ -3,6 +3,12 @@
 # KAD codes for this client (spec §7.3):
 kad_codes: ["46.35", "46.37", "46.38", "56.10", "56.30"]
 
+# LLM classifier routing + Class C retention (spec §7.2/§7.6).
+triage:
+  high_confidence: 0.85          # >this on high/low → auto A/B; else Class C
+  class_c_ttl_days: 7            # staging full-text TTL before `overdue`
+  class_c_sla_business_days: 2   # relevance-review SLA (metrics)
+
 rules:
   # --- Explicit include (auto Class A) ---
   - rule_id: kad_direct_mention

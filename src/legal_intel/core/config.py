@@ -83,6 +83,16 @@ class TaggingConfig(BaseModel):
     model: Optional[str] = None
 
 
+class TriageConfig(BaseModel):
+    #: Confidence above which a high/low LLM verdict is auto-filed to A/B;
+    #: everything else routes to Class C (spec §7.2).
+    high_confidence: float = 0.85
+    #: Class C staging full-text TTL (calendar days) before `overdue` (spec §7.6).
+    class_c_ttl_days: int = 7
+    #: Class C relevance-review SLA (business days), for metrics/alerts.
+    class_c_sla_business_days: int = 2
+
+
 class RelevanceRule(BaseModel):
     rule_id: str
     action: str  # "classify_A" | "classify_B"
@@ -124,6 +134,7 @@ class AppConfig(BaseModel):
     interpretation: InterpretationConfig
     dedup: DedupConfig = Field(default_factory=DedupConfig)
     tagging: TaggingConfig = Field(default_factory=TaggingConfig)
+    triage: TriageConfig = Field(default_factory=TriageConfig)
     kad_codes: list[str] = Field(default_factory=list)
 
     def enabled_sources(self) -> list[SourceConfig]:
@@ -152,6 +163,7 @@ def load_config() -> AppConfig:
         interpretation=InterpretationConfig(**interp_raw["interpretation"]),
         dedup=DedupConfig(**dedup_raw),
         tagging=TaggingConfig(**tagging_raw),
+        triage=TriageConfig(**rules_raw.get("triage", {})),
         kad_codes=[str(k) for k in rules_raw.get("kad_codes", [])],
     )
 
