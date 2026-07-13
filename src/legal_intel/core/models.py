@@ -185,6 +185,9 @@ class Item(BaseModel):
     #: `supersedes_ref` (e.g. a corrigendum's base CELEX). Dedup resolves it to a
     #: superseded Item id and clears it (AD-15). Not a persisted relation itself.
     supersedes_ref: Optional[str] = None
+    #: Transient source-provided topic signals (EuroVoc descriptors, source topic
+    #: hints) that the tagger maps to Ontology Topics (Story 5.1). Not persisted.
+    descriptor_hints: list[str] = Field(default_factory=list)
 
     # Lifecycle
     status: ItemStatus = ItemStatus.NEW

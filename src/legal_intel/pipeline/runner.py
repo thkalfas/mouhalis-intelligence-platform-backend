@@ -35,6 +35,10 @@ from . import triage as triage_mod
 # --------------------------------------------------------------------------- #
 def phase0_responder(stage: str, prompt: str) -> str:
     p = prompt.lower()
+    if stage == "topic_tag":
+        # Phase-0 tagger is a no-op (rule-based tagging already covers the fake
+        # fixtures); real topic proposals come from the Anthropic backend.
+        return json.dumps({"topics": []})
     if stage == "relevance_classify":
         if "ναυτ" in p or "maritime" in p or "λιμ" in p:
             return json.dumps({"relevance": "low", "confidence": 0.95,
@@ -173,7 +177,7 @@ class PipelineRunner:
 
         # New item: triage decides the Content Class.
         self._transition(item, ItemStatus.AWAITING_TRIAGE)
-        item = tag_mod.tag(item, self.cfg)
+        item = tag_mod.tag(item, self.cfg, self.llm)
         item = triage_mod.triage(item, self.cfg, self.llm)
 
         if item.content_class is ContentClass.A:

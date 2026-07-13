@@ -7,17 +7,17 @@ production pipeline that runs headless, collects from ~15 Greek/EU sources,
 deduplicates and classifies each Legal Event, and drafts a structured interpretation
 for the ones that matter. Notion is the single source of truth the legal team works in.
 
-> **Status: Phase 0 ✅ · Epics 1–4 ✅ (all three collection tiers + dedup).** The
-> full flow runs end-to-end offline on *fake* data; the seven Tier-1 adapters plus
-> real text extraction are implemented; deduplication does config-driven weighted
-> scoring, authority-ranked identity-preserving merge, supersession, and a human
-> confirmation queue; Tier-2 scraping runs through one politeness-enforcing client
-> (rate-limit, jitter, rotating UA, robots, circuit breaker) with zero-row breakage
-> alerts and six config-driven scrapers; and the Tier-3 commercial shared-inbox
-> parser reads only the dedicated mailbox, marking editorial that never wins
-> metadata over official sources. All unit-tested against fixtures — still zero
-> network/tokens. See `_bmad-output/` for the PRD, architecture spine, and the
-> epic/story breakdown that drive the build.
+> **Status: Phase 0 ✅ · Epics 1–5 ✅ (all collection tiers + dedup + tagging).**
+> The full flow runs end-to-end offline on *fake* data; the seven Tier-1 adapters
+> plus real text extraction are implemented; deduplication does config-driven
+> weighted scoring, authority-ranked identity-preserving merge, supersession, and a
+> human confirmation queue; Tier-2 scraping runs through one politeness-enforcing
+> client (rate-limit, jitter, rotating UA, robots, circuit breaker) with zero-row
+> breakage alerts and six config-driven scrapers; the Tier-3 commercial shared-inbox
+> parser reads only the dedicated mailbox; and topic tagging maps Ontology
+> keywords + EuroVoc descriptors with a metered, Ontology-validated LLM fallback.
+> All unit-tested against fixtures — still zero network/tokens. See `_bmad-output/`
+> for the PRD, architecture spine, and the epic/story breakdown that drive the build.
 
 ## Architecture in one line
 
@@ -44,7 +44,7 @@ Runs offline — no Notion token or API key needed (local backend + fake LLM).
 # venv + pip (works everywhere; .venv/ is machine-local — recreate on new checkouts)
 python -m venv .venv
 .venv/Scripts/python -m pip install -e ".[dev]"   # Windows; on POSIX use .venv/bin/python
-.venv/Scripts/python -m pytest -q                 # run the test suite (90 tests)
+.venv/Scripts/python -m pytest -q                 # run the test suite (99 tests)
 .venv/Scripts/python -m legal_intel               # walking skeleton end-to-end
 
 # or, if uv is installed
@@ -76,7 +76,7 @@ by their backends and ship in the `full` extra: `pip install -e ".[full]"`.
 
 ## What's next
 
-Epic 5 (topic tagging) onward — see
+Epic 6 (relevance triage) onward — see
 [`_bmad-output/planning-artifacts/epics.md`](_bmad-output/planning-artifacts/epics.md)
 and `HANDOFF.md` for the current state and the next step. Continue with the BMAD
 implementation flow (`bmad-sprint-planning` → `bmad-create-story` →

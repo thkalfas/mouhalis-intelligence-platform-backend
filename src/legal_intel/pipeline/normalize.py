@@ -64,4 +64,9 @@ def normalize(record: SourceRecord) -> Item:
     supersedes_ref = record.raw_metadata.get("supersedes_ref")
     if supersedes_ref:
         item.supersedes_ref = str(supersedes_ref)
+    # Source-provided topic signals (EuroVoc descriptors / hints) for the tagger.
+    hints = (record.raw_metadata.get("eurovoc_descriptors")
+             or record.raw_metadata.get("topics_hint") or [])
+    if isinstance(hints, list):
+        item.descriptor_hints = [str(h) for h in hints]
     return item

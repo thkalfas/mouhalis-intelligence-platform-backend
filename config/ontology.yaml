@@ -9,6 +9,7 @@ topics:
     domain: tobacco
     keywords_gr: ["ιχνηλασιμότητα", "ΕΚΜΕΑ", "ένσημες ταινίες"]
     keywords_en: ["tobacco traceability", "track and trace"]
+    eurovoc_descriptors: ["manufactured tobacco", "tobacco industry"]
     priority: high
 
   - topic_id: tobacco_excise
@@ -25,6 +26,7 @@ topics:
     domain: food
     keywords_gr: ["επισήμανση τροφίμων", "αλλεργιογόνα", "διατροφική δήλωση"]
     keywords_en: ["food labelling", "allergen labelling"]
+    eurovoc_descriptors: ["food labelling", "foodstuff"]
     priority: high
 
   - topic_id: food_recall

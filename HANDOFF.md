@@ -24,7 +24,7 @@ This repo is **Environment A** — the production pipeline. **Environment B** (8
 - **Scope: Environment A only** this track.
 - **Paradigm: pipes-and-filters over a Notion blackboard** — each stage is an idempotent filter reading Items in one `status` and writing them in the next; `status` is the only coordination pipe (AD-1). Notion's lack of coordination primitives is handled explicitly by AD-13..AD-16 (single-consumer statuses, key-serialized upserts, dedup-owned precedence, no silent late mutation).
 
-## Status: Phase 0 ✅ + Epics 1–4 ✅
+## Status: Phase 0 ✅ + Epics 1–5 ✅
 
 **Epic 0 (walking skeleton)** — the full flow runs offline on fake data:
 `src/legal_intel/` = core contracts (models, state machine, config-as-data, `NotionGateway` with upsert-by-key idempotency, `MeteredLLMClient`), the pipeline (normalize → dedup → tag → triage → interpret), and platform services (scheduler, cost ledger, logging, alerting, scraping politeness). Backends are pluggable — local store + fake LLM by default (offline), real Notion/Anthropic lazy-imported for later.
@@ -54,12 +54,17 @@ This repo is **Environment A** — the production pipeline. **Environment B** (8
 - Sender→source mapping is config (`sender_source_map`); every commercial source is `authority_rank: 3`, so Epic 2's merge guarantees a commercial record never wins metadata over an official Source (covered by a test) while its editorial is preserved.
 - Registry gained the `inbox` key (tier-3 → `HttpClient`); `sources.yaml` gained a `Commercial Inbox` source (disabled).
 
+**Epic 5 (Topic Tagging) — implemented and tested** (FR-6, AD-7/8):
+- `pipeline/tag.py` — rule-based first: Ontology keyword matching (GR/EN) over title+full text **plus** EuroVoc-descriptor/source-hint → Topic mapping, every result constrained to Ontology `topic_id`s (an unknown keyword or descriptor never creates a Topic). `Topic` gained `eurovoc_descriptors`/`celex_types`; `Item.descriptor_hints` (transient) is populated by normalize from `raw_metadata` (`eurovoc_descriptors`/`topics_hint`).
+- LLM **edge-case tagger** (Story 5.2): runs via the `MeteredLLMClient` (stage `topic_tag`) only for Items rule-based tagging leaves untagged, proposals validated against the Ontology before persist (AD-7). Config-gated by `config/tagging.yaml` (`llm_fallback`, optional `model`; the file is optional — safe defaults if absent). The runner passes its `llm` to `tag()`; the phase-0 fake responder returns no topics so the walking skeleton is byte-for-byte unchanged.
+- `tagging_coverage(items)` helper for the >90% data-quality target (surfaced later by the Quality Observer).
+
 ## Run it
 
 `uv` was not installed on the current machine; use the project venv directly (see setup below). With `uv` present, `uv run --extra dev python -m pytest -q` also works.
 
 ```bash
-.venv/Scripts/python -m pytest -q     # 90 tests, all green
+.venv/Scripts/python -m pytest -q     # 99 tests, all green
 .venv/Scripts/python -m legal_intel   # walking skeleton end-to-end (offline)
 ```
 
@@ -67,7 +72,7 @@ Expected skeleton run: 4 fake events ingested → **3 Items** (one duplicate mer
 
 ## Next step
 
-**Epic 5 — Topic Tagging**: `pipeline/tag.py` already does rule-based Ontology keyword tagging (Phase 0). Epic 5 completes it: Story 5.1 tightens rule-based tagging (EuroVoc pre-filter for EUR-Lex items, >90% coverage gate, only Ontology-defined Topics) and Story 5.2 adds the **LLM edge-case tagger** via the `MeteredLLMClient` for Items no rule tags, with its output validated against the Ontology before persist (AD-7). See `epics.md` → Epic 5. Note: `config/ontology.yaml` is still a **draft placeholder** pending the client's 90-min ontology workshop (a PRD open question) — Epic 5 code is data-driven so it works against whatever the workshop finalizes. (Then Epic 6 triage, Epic 7 interpretation, Epic 8 review workflows.)
+**Epic 6 — Relevance Triage** (the core value: cut 60-70% noise). `pipeline/triage.py` already has the Phase-0 shape — deterministic rules → LLM classifier → A/B/C with `class_reasoning` and class-aware retention (AD-5/13). Epic 6 hardens it against the spec: Story 6.1 deterministic include/exclude rules (KAD match / high-priority topic → A; all-excluded-sector → B; record the fired rule id), Story 6.2 the LLM classifier's full structured JSON contract (`relevance`, `confidence`, Greek `reasoning`, `sector_touchpoints[]`, `action_signal`, `specialist_needed`) with confidence-threshold routing to A/B/C, and Story 6.3 class-aware retention incl. the **Class C 7-day staging TTL + `overdue` flag** and the promote-to-A "full text present before flipping class" check (AD-2). See `epics.md` → Epic 6. Note: `config/ontology.yaml` remains a **draft placeholder** pending the client's ontology workshop, but all triage code is data-driven. (Then Epic 7 interpretation, Epic 8 review workflows.)
 
 Notes on activation of already-built collection tiers:
 - **Tier-2**: the row/link/id selectors in `sources.yaml` are best-effort defaults — verify each against the live page (spec §5.2). JS-heavy sites (ΣτΕ, RASFF scrape mode) need a Playwright-backed fetcher injected into the `ScrapeClient`; the default fetcher is static-HTML httpx.

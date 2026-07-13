@@ -1,0 +1,5 @@
+# Topic-tagging policy as data (AD-8). Optional file — safe defaults apply if it
+# is absent. The LLM edge-case tagger runs only for Items that rule-based tagging
+# leaves untagged, and its proposals are constrained to the Ontology (Story 5.2).
+llm_fallback: true
+model: null   # null → use interpretation.default_model; set to e.g. a Haiku id to cut cost

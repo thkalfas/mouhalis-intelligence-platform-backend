@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import yaml
 from pydantic import BaseModel, Field
@@ -37,6 +37,14 @@ def _load_yaml(name: str) -> dict[str, Any]:
     return data
 
 
+def _load_yaml_optional(name: str) -> dict[str, Any]:
+    """Like ``_load_yaml`` but returns ``{}`` if the file is absent (used for
+    config that has safe defaults). A malformed present file still fails fast."""
+    if not (config_dir() / name).exists():
+        return {}
+    return _load_yaml(name)
+
+
 # --------------------------------------------------------------------------- #
 # Typed config objects
 # --------------------------------------------------------------------------- #
@@ -61,7 +69,18 @@ class Topic(BaseModel):
     domain: str = ""
     keywords_gr: list[str] = Field(default_factory=list)
     keywords_en: list[str] = Field(default_factory=list)
+    #: EuroVoc descriptors (EUR-Lex pre-filter/mapping) and CELEX types that map
+    #: to this Topic (spec §4). Used by the tagger's descriptor path.
+    eurovoc_descriptors: list[str] = Field(default_factory=list)
+    celex_types: list[str] = Field(default_factory=list)
     priority: str = "medium"
+
+
+class TaggingConfig(BaseModel):
+    #: Run the LLM edge-case tagger when rule-based tagging finds no Topic.
+    llm_fallback: bool = True
+    #: Optional model override for tagging (else the interpretation default_model).
+    model: Optional[str] = None
 
 
 class RelevanceRule(BaseModel):
@@ -104,6 +123,7 @@ class AppConfig(BaseModel):
     relevance_rules: list[RelevanceRule]
     interpretation: InterpretationConfig
     dedup: DedupConfig = Field(default_factory=DedupConfig)
+    tagging: TaggingConfig = Field(default_factory=TaggingConfig)
     kad_codes: list[str] = Field(default_factory=list)
 
     def enabled_sources(self) -> list[SourceConfig]:
@@ -123,6 +143,7 @@ def load_config() -> AppConfig:
     rules_raw = _load_yaml("relevance_rules.yaml")
     interp_raw = _load_yaml("interpretation_config.yaml")
     dedup_raw = _load_yaml("dedup.yaml")
+    tagging_raw = _load_yaml_optional("tagging.yaml")
 
     return AppConfig(
         sources=[SourceConfig(**s) for s in sources_raw.get("sources", [])],
@@ -130,6 +151,7 @@ def load_config() -> AppConfig:
         relevance_rules=[RelevanceRule(**r) for r in rules_raw.get("rules", [])],
         interpretation=InterpretationConfig(**interp_raw["interpretation"]),
         dedup=DedupConfig(**dedup_raw),
+        tagging=TaggingConfig(**tagging_raw),
         kad_codes=[str(k) for k in rules_raw.get("kad_codes", [])],
     )
 
