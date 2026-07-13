@@ -78,11 +78,32 @@ class InterpretationConfig(BaseModel):
     max_tokens: int = 4000
 
 
+class DedupWeights(BaseModel):
+    exact_source_id: float = 1.0
+    text_hash: float = 0.95
+    title_similarity: float = 0.6
+    authority_date: float = 0.5
+    topic_entity_overlap: float = 0.3
+
+
+class DedupThresholds(BaseModel):
+    title_similarity_min: float = 0.85
+    topic_overlap_min: float = 0.70
+    auto_merge: float = 0.95
+    confirm_low: float = 0.70
+
+
+class DedupConfig(BaseModel):
+    weights: DedupWeights = Field(default_factory=DedupWeights)
+    thresholds: DedupThresholds = Field(default_factory=DedupThresholds)
+
+
 class AppConfig(BaseModel):
     sources: list[SourceConfig]
     ontology: list[Topic]
     relevance_rules: list[RelevanceRule]
     interpretation: InterpretationConfig
+    dedup: DedupConfig = Field(default_factory=DedupConfig)
     kad_codes: list[str] = Field(default_factory=list)
 
     def enabled_sources(self) -> list[SourceConfig]:
@@ -101,12 +122,14 @@ def load_config() -> AppConfig:
     ontology_raw = _load_yaml("ontology.yaml")
     rules_raw = _load_yaml("relevance_rules.yaml")
     interp_raw = _load_yaml("interpretation_config.yaml")
+    dedup_raw = _load_yaml("dedup.yaml")
 
     return AppConfig(
         sources=[SourceConfig(**s) for s in sources_raw.get("sources", [])],
         ontology=[Topic(**t) for t in ontology_raw.get("topics", [])],
         relevance_rules=[RelevanceRule(**r) for r in rules_raw.get("rules", [])],
         interpretation=InterpretationConfig(**interp_raw["interpretation"]),
+        dedup=DedupConfig(**dedup_raw),
         kad_codes=[str(k) for k in rules_raw.get("kad_codes", [])],
     )
 

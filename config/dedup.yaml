@@ -1,0 +1,16 @@
+# Deduplication policy as data (AD-8, spec §3.3). Signal weights and thresholds
+# change more often than code — they live here, never hard-coded. The authority
+# hierarchy that decides which source "wins" a merge is `authority_rank` in
+# sources.yaml (lower = more authoritative); this file only holds the scoring.
+weights:
+  exact_source_id: 1.0      # same CELEX/ΑΔΑ/ΦΕΚ number = certain match
+  text_hash: 0.95           # identical normalized full text
+  title_similarity: 0.6     # near-identical titles → suspected duplicate
+  authority_date: 0.5       # same authority + same publication date
+  topic_entity_overlap: 0.3 # same topics/entities → probably same subject
+
+thresholds:
+  title_similarity_min: 0.85  # Levenshtein/ratio above which the title signal fires
+  topic_overlap_min: 0.70     # topic/entity overlap above which that signal fires
+  auto_merge: 0.95            # aggregate ≥ this → certain duplicate (auto-merge)
+  confirm_low: 0.70           # aggregate in [confirm_low, auto_merge) → human confirm

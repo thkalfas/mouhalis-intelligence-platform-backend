@@ -24,7 +24,7 @@ This repo is **Environment A** — the production pipeline. **Environment B** (8
 - **Scope: Environment A only** this track.
 - **Paradigm: pipes-and-filters over a Notion blackboard** — each stage is an idempotent filter reading Items in one `status` and writing them in the next; `status` is the only coordination pipe (AD-1). Notion's lack of coordination primitives is handled explicitly by AD-13..AD-16 (single-consumer statuses, key-serialized upserts, dedup-owned precedence, no silent late mutation).
 
-## Status: Phase 0 ✅ + Epic 1 ✅
+## Status: Phase 0 ✅ + Epic 1 ✅ + Epic 2 ✅
 
 **Epic 0 (walking skeleton)** — the full flow runs offline on fake data:
 `src/legal_intel/` = core contracts (models, state machine, config-as-data, `NotionGateway` with upsert-by-key idempotency, `MeteredLLMClient`), the pipeline (normalize → dedup → tag → triage → interpret), and platform services (scheduler, cost ledger, logging, alerting, scraping politeness). Backends are pluggable — local store + fake LLM by default (offline), real Notion/Anthropic lazy-imported for later.
@@ -35,12 +35,19 @@ This repo is **Environment A** — the production pipeline. **Environment B** (8
 - `adapters/` — `eurlex` (SPARQL + CELEX REST, EuroVoc pre-filter, corrigendum→`supersedes_ref`), `diavgeia` (opendata search per org UID, PDF download + checksum check), `rss` (config-driven, serves EDPB + EFSA), `vouli`, `gdprhub` (MediaWiki recentchanges + wikitext), `datagovgr` (API key from the secret store). All endpoints/windows/UIDs/descriptors live in `config/sources.yaml` `options:` (AD-8).
 - `adapters/registry.py` — maps the `adapter` key in `sources.yaml` to its class (lazy-imported); the CLI/scheduler build enabled sources from config. Real Tier-1 sources ship `enabled: false` until their prerequisites (below) are signed off.
 
+**Epic 2 (Deduplication & Merge) — implemented and tested** (FR-5, AD-14/15/16):
+- `pipeline/dedup.py` rewritten: config-driven weighted signals (`config/dedup.yaml` → `DedupConfig`, AD-8) with a **capped-sum** aggregate into `dedup_score`; thresholds route to auto-merge / `Awaiting Dedup Confirmation` / distinct.
+- **Authority-ranked, identity-preserving merge** — the surviving Item always keeps the *first-seen* `page_id`/identity (stable upsert key, no duplicate page regardless of arrival order — this fixed a latent bug where a higher-authority source arriving *second* would have minted a second page); authority governs *content* fields via the new `Item.primary_source`. All source URLs kept in `additional_sources[]`, commercial editorial in `external_commentary`.
+- **AD-16** — a content-changing merge onto an already-interpreted Item enqueues re-interpretation (routes back to `Class A - Awaiting Interpretation` for a fresh draft) instead of mutating an Approved reading. New pipeline transitions added for this.
+- **AD-15 supersession** — a superseding version (e.g. an EUR-Lex corrigendum, carried via `raw_metadata.supersedes_ref` → `Item.supersedes_ref`) becomes a distinct Item that links `supersedes` to its predecessor, inherits its Topics, and drives the predecessor through `Superseded`.
+- **Dedup-confirmation queue** — `dedup.confirm_merge()` / `reject_as_distinct()` (HUMAN actor) resolve `Awaiting Dedup Confirmation` items.
+
 ## Run it
 
 `uv` was not installed on the current machine; use the project venv directly (see setup below). With `uv` present, `uv run --extra dev python -m pytest -q` also works.
 
 ```bash
-.venv/Scripts/python -m pytest -q     # 54 tests, all green
+.venv/Scripts/python -m pytest -q     # 69 tests, all green
 .venv/Scripts/python -m legal_intel   # walking skeleton end-to-end (offline)
 ```
 
@@ -48,7 +55,7 @@ Expected skeleton run: 4 fake events ingested → **3 Items** (one duplicate mer
 
 ## Next step
 
-**Epic 2 — Deduplication & Merge** (weighted duplicate scoring, authority-ranked merge, `supersedes`/precedent relations + dedup-confirmation queue). See `epics.md` → Epic 2. The dedup filter already exists as a Phase-0 stub in `pipeline/dedup.py` — Epic 2 makes it weighted and authority-aware per FR-5 / AD-14/15/16. (Then Epic 3 Tier-2 scrapers, Epic 4 Tier-3 inbox, etc.)
+**Epic 3 — Tier-2 Collection (scraping)**: the shared scraping-politeness middleware (`platform/politeness.py` already holds the policy object from Phase 0 — Epic 3 adds the enforcing HTTP wrapper on top of it, AD-10), change-detection + breakage alerts, and the six Tier-2 scrapers (ΦΕΚ, ΣτΕ, ΕπΑντ, ΕΦΕΤ, RASFF, dpa.gr). See `epics.md` → Epic 3. Note: scrapers need Playwright (`full` extra) and should be built offline-testable the same way the Tier-1 adapters are (inject the fetch seam; fixture HTML). ΕπΑντ prefers the Δι@ύγεια path already built in Epic 1. (Then Epic 4 Tier-3 inbox, Epic 5 tagging, Epic 6 triage, Epic 7 interpretation, Epic 8 review workflows.)
 
 Continue with the BMAD implementation flow (`bmad-sprint-planning` → `bmad-create-story` → `bmad-dev-story`) **if BMAD is installed** on this machine (global at `~/.claude/_bmad`; reinstall v6.10.0 if absent). If BMAD isn't available, just implement directly from `epics.md` — the code is independent of BMAD.
 

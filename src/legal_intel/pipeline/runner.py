@@ -129,6 +129,15 @@ class PipelineRunner:
                          content_class=cls)
         return report
 
+    def _reinterpret(self, item: Item) -> Item:
+        """Re-run interpretation after a content-changing late merge (AD-16):
+        route the Item back to Awaiting Interpretation for a fresh draft rather
+        than mutating the existing (possibly Approved) reading in place."""
+        self._transition(item, ItemStatus.CLASS_A_AWAITING_INTERPRETATION)
+        item = interpret_mod.interpret(item, self.cfg, self.llm)
+        self._transition(item, ItemStatus.CLASS_A_DRAFT_INTERPRETATION)
+        return item
+
     def _process(self, record, known: list[Item]) -> Item:
         item = normalize_mod.normalize(record)  # may raise PermanentError
 
@@ -137,14 +146,29 @@ class PipelineRunner:
         if item not in known:
             known.append(item)
 
+        # Superseding version (AD-15): retire the predecessor, then let the new
+        # Item flow through triage/interpretation as fresh content.
+        if outcome.superseded_target is not None:
+            target = outcome.superseded_target
+            if sm.can_transition(target.status, ItemStatus.SUPERSEDED, sm.Actor.PIPELINE):
+                self._transition(target, ItemStatus.SUPERSEDED)
+                self.gateway.upsert_item(target)
+            else:
+                self.log.log(source=record.source_name, event="supersede",
+                             status="skipped", item_id=target.page_id,
+                             error=f"cannot supersede from {target.status.value}")
+
         # Probable duplicate → human dedup-confirmation queue (AD-5).
         if outcome.needs_confirmation and item.content_class is None:
             self._transition(item, ItemStatus.AWAITING_DEDUP_CONFIRMATION)
             return item
 
         # Already classified (merged into an existing Item, or a prior run) →
-        # skip re-triage/re-interpret: idempotent and cost-free (AD-4, AD-7).
+        # normally skip re-triage/re-interpret (idempotent, cost-free; AD-4, AD-7),
+        # unless the merge changed content of an interpreted Item (AD-16).
         if item.content_class is not None:
+            if outcome.reinterpret and item.content_class is ContentClass.A:
+                return self._reinterpret(item)
             return item
 
         # New item: triage decides the Content Class.

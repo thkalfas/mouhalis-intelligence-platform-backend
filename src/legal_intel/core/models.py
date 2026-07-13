@@ -176,6 +176,16 @@ class Item(BaseModel):
     external_commentary: Optional[str] = None
     supersedes: list[str] = Field(default_factory=list)  # Item ids (AD-15)
 
+    #: The source_name whose metadata/full text currently populate the content
+    #: fields — the most authoritative contributor seen so far. Identity
+    #: (source_id/source_name/hash) stays first-seen for a stable upsert key
+    #: (AD-14); authority governs *content* via this field (dedup merge, AD-15/2.2).
+    primary_source: Optional[str] = None
+    #: Transient raw pointer set by normalization from a source's
+    #: `supersedes_ref` (e.g. a corrigendum's base CELEX). Dedup resolves it to a
+    #: superseded Item id and clears it (AD-15). Not a persisted relation itself.
+    supersedes_ref: Optional[str] = None
+
     # Lifecycle
     status: ItemStatus = ItemStatus.NEW
     overdue: bool = False

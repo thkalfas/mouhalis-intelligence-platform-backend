@@ -36,8 +36,13 @@ _PIPELINE_TRANSITIONS: set[tuple[S, S]] = {
     (S.REQUIRES_ACTION, S.SUPERSEDED),
     (S.CLASS_A_DRAFT_INTERPRETATION, S.SUPERSEDED),
     (S.CLASS_B_INDEXED, S.SUPERSEDED),
-    # Re-interpretation after a late merge (AD-16) or reject.
+    # Re-interpretation after a late merge (AD-16) or reject. A content-changing
+    # merge can land on an Item in any post-interpretation state, so each routes
+    # back to Awaiting Interpretation for a fresh draft (the prior reading is not
+    # mutated in place).
     (S.APPROVED, S.CLASS_A_AWAITING_INTERPRETATION),
+    (S.CLASS_A_DRAFT_INTERPRETATION, S.CLASS_A_AWAITING_INTERPRETATION),
+    (S.REQUIRES_ACTION, S.CLASS_A_AWAITING_INTERPRETATION),
 }
 
 # Human-only transitions (reviewers in Notion, WF1/WF2/WF3):

@@ -53,9 +53,15 @@ def normalize(record: SourceRecord) -> Item:
         hash=text_hash(full_text or record.title),
         needs_ocr=needs_ocr,
         collected_at=record.collected_at,
+        primary_source=record.source_name,  # this source is the initial content source
     )
     # Preserve any editorial the source carried, for the interpretation stage.
     commentary = record.raw_metadata.get("external_commentary")
     if commentary:
         item.external_commentary = commentary
+    # A superseding version (e.g. an EUR-Lex corrigendum) carries the base
+    # identifier of the work it replaces; dedup resolves it to an Item (AD-15).
+    supersedes_ref = record.raw_metadata.get("supersedes_ref")
+    if supersedes_ref:
+        item.supersedes_ref = str(supersedes_ref)
     return item
