@@ -7,18 +7,21 @@ production pipeline that runs headless, collects from ~15 Greek/EU sources,
 deduplicates and classifies each Legal Event, and drafts a structured interpretation
 for the ones that matter. Notion is the single source of truth the legal team works in.
 
-> **Status: Phase 0 ✅ · Epics 1–7 ✅ — the full automated pipeline.** End-to-end
-> offline on *fake* data: all three collection tiers (seven Tier-1 adapters + text
-> extraction, six politeness-governed Tier-2 scrapers, the Tier-3 commercial
-> shared-inbox parser); config-driven weighted dedup with authority-ranked
-> identity-preserving merge, supersession, and a human confirmation queue; Ontology
-> topic tagging (keywords + EuroVoc) with a metered, Ontology-validated LLM
-> fallback; relevance triage into A/B/C (deterministic rules → structured LLM
-> classifier) with class-aware retention and a Class C TTL/overdue sweep; and a
-> schema-validated interpretation engine with retrieval augmentation, few-shot
-> examples, and model escalation. All unit-tested against fixtures — still zero
-> network/tokens. Remaining: **Epic 8** (human review workflows + weekly Quality
-> Observer). See `_bmad-output/` for the PRD, architecture spine, and epic/story plan.
+> **Status: Phase 0 + Epics 1–8 ✅ — Environment A feature-complete.** The whole
+> pipeline runs end-to-end offline on *fake* data (145 tests): all three collection
+> tiers (seven Tier-1 adapters + text extraction, six politeness-governed Tier-2
+> scrapers, the Tier-3 commercial shared-inbox parser); config-driven weighted dedup
+> with authority-ranked identity-preserving merge, supersession, and a human
+> confirmation queue; Ontology topic tagging (keywords + EuroVoc) with a metered,
+> Ontology-validated LLM fallback; relevance triage into A/B/C with class-aware
+> retention and a Class C TTL/overdue sweep; a schema-validated interpretation
+> engine with retrieval augmentation, few-shot, and model escalation; and the human
+> review workflows (WF1/WF2/WF3, bidirectional edits, B→A reclassify) plus the
+> weekly Quality Observer. Still zero network/tokens — real backends are pluggable.
+> What remains is productionization (real-source activation, ontology workshop,
+> Notion write mapping, scheduler wiring) and the separate Environment B (Cowork
+> agents). See `_bmad-output/` for the PRD, architecture spine, and epic/story plan,
+> and `HANDOFF.md` for the activation checklist.
 
 ## Architecture in one line
 
@@ -29,12 +32,12 @@ only coordination pipe. Full contract in
 (16 architecture decisions, AD-1..AD-16).
 
 ```
-adapters/  → the only code that talks to the outside world (Tier 1/2/3 sources)
-pipeline/  → the filters: normalize → dedup → tag → triage → interpret
-agents/    → Claude Agent SDK agents (triage, interpretation, quality observer)
+adapters/  → the only code that talks to the outside world (Tier 1/2/3 sources) + registry
+pipeline/  → the filters: normalize → dedup → tag → triage → interpret; retention + review workflows
+agents/    → the Quality Observer (weekly health metrics/retro)
 core/      → shared contracts: models, state machine, MeteredLLMClient, NotionGateway, config
-platform/  → scheduler, politeness middleware, cost ledger, logging, alerting
-config/    → business rules as data (sources, ontology, relevance rules, interpretation)
+platform/  → scheduler, HTTP + scraping-politeness clients, cost ledger, logging, alerting
+config/    → business rules as data (sources, ontology, relevance/dedup/tagging rules, interpretation)
 ```
 
 ## Quick start (Phase 0)
@@ -45,7 +48,7 @@ Runs offline — no Notion token or API key needed (local backend + fake LLM).
 # venv + pip (works everywhere; .venv/ is machine-local — recreate on new checkouts)
 python -m venv .venv
 .venv/Scripts/python -m pip install -e ".[dev]"   # Windows; on POSIX use .venv/bin/python
-.venv/Scripts/python -m pytest -q                 # run the test suite (123 tests)
+.venv/Scripts/python -m pytest -q                 # run the test suite (145 tests)
 .venv/Scripts/python -m legal_intel               # walking skeleton end-to-end
 
 # or, if uv is installed
@@ -77,13 +80,18 @@ by their backends and ship in the `full` extra: `pip install -e ".[full]"`.
 
 ## What's next
 
-Epic 8 (human review workflows + Quality Observer) — the final epic — see
-[`_bmad-output/planning-artifacts/epics.md`](_bmad-output/planning-artifacts/epics.md)
-and `HANDOFF.md` for the current state and the next step. Continue with the BMAD
-implementation flow (`bmad-sprint-planning` → `bmad-create-story` →
-`bmad-dev-story`) per story, or implement directly from `epics.md`.
+All 9 epics (0–8) are implemented and tested — **Environment A is feature-complete**.
+What remains is productionization, not new pipeline code. See `HANDOFF.md` →
+"Next step" for the full activation checklist. In short:
 
-To **activate** a real Tier-1 source: fill its `options:` in `config/sources.yaml`
-(org UIDs, dataset, etc.), set `enabled: true`, install the `full` extra
-(`pip install -e ".[full]"` for `httpx`/`pdfplumber`), and provide any secrets in
-`.env`. The adapters are already wired via `adapters/registry.py`.
+- **Activate real sources** (per source, gated on the PRD §14 open questions): fill
+  its `options:` in `config/sources.yaml`, set `enabled: true`, install the `full`
+  extra (`pip install -e ".[full]"`), and provide secrets in `.env`. Adapters are
+  already wired via `adapters/registry.py` (Tier-1 → `HttpClient`, Tier-2 →
+  `ScrapeClient`, Tier-3 inbox → IMAP). Tier-2 selectors + the Playwright fetcher
+  need live verification; real Notion write mapping (`NotionApiBackend.write_page`)
+  is the remaining stub before `LEGAL_INTEL_NOTION_BACKEND=notion`.
+- **Ontology workshop** finalizes `config/ontology.yaml` (still a draft); the
+  **Client Context Document** (`config/client_context.md`) lifts interpretation cold
+  start. Both are data — no code changes.
+- **Environment B (Cowork agents)** is a separate downstream track (`cowork-agents.md`).

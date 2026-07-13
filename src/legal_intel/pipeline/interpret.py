@@ -122,6 +122,7 @@ def interpret(item: Item, cfg: AppConfig, llm: MeteredLLMClient,
               known: Optional[list[Item]] = None,
               now: Optional[datetime] = None) -> Item:
     log = get_logger()
+    now = now or datetime.now(timezone.utc)
     related = retrieve_related(item, known or [], now)
     examples = few_shot_examples(item, cfg)
     log.log(source="interpret", event="interpretation_retrieval", status="ok",
@@ -145,4 +146,5 @@ def interpret(item: Item, cfg: AppConfig, llm: MeteredLLMClient,
 
     item.interpretation = interp
     item.interpretation_confidence = payload.get("_self_confidence", 0.7)
+    item.draft_created_at = now  # metric anchor for time-to-approval (spec §9.5)
     return item

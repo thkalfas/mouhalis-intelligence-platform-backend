@@ -194,6 +194,22 @@ class Item(BaseModel):
     #: hints) that the tagger maps to Ontology Topics (Story 5.1). Not persisted.
     descriptor_hints: list[str] = Field(default_factory=list)
 
+    # Group 4 — human review workflow (Epic 8, spec §10.1). Populated by WF1/2/3.
+    reviewer: Optional[str] = None
+    review_started_at: Optional[datetime] = None
+    review_completed_at: Optional[datetime] = None
+    review_notes: Optional[str] = None
+    review_feedback: dict[str, Any] = Field(default_factory=dict)  # edit diff (WF2)
+    client_action_status: Optional[str] = None
+    action_owner: Optional[str] = None
+    action_deadline: Optional[date] = None
+    reclassify_requested: bool = False
+    reclassified_from_b: bool = False  # set on a B→A re-fetch (for the <5% metric)
+    # Metric timestamps (spec §9.5).
+    class_c_assigned_at: Optional[datetime] = None
+    class_c_decided_at: Optional[datetime] = None
+    draft_created_at: Optional[datetime] = None
+
     # Lifecycle
     status: ItemStatus = ItemStatus.NEW
     overdue: bool = False

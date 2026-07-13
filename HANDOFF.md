@@ -24,7 +24,7 @@ This repo is **Environment A** — the production pipeline. **Environment B** (8
 - **Scope: Environment A only** this track.
 - **Paradigm: pipes-and-filters over a Notion blackboard** — each stage is an idempotent filter reading Items in one `status` and writing them in the next; `status` is the only coordination pipe (AD-1). Notion's lack of coordination primitives is handled explicitly by AD-13..AD-16 (single-consumer statuses, key-serialized upserts, dedup-owned precedence, no silent late mutation).
 
-## Status: Phase 0 ✅ + Epics 1–7 ✅ (full automated pipeline)
+## Status: Phase 0 ✅ + Epics 1–8 ✅ — **Environment A feature-complete**
 
 **Epic 0 (walking skeleton)** — the full flow runs offline on fake data:
 `src/legal_intel/` = core contracts (models, state machine, config-as-data, `NotionGateway` with upsert-by-key idempotency, `MeteredLLMClient`), the pipeline (normalize → dedup → tag → triage → interpret), and platform services (scheduler, cost ledger, logging, alerting, scraping politeness). Backends are pluggable — local store + fake LLM by default (offline), real Notion/Anthropic lazy-imported for later.
@@ -69,12 +69,18 @@ This repo is **Environment A** — the production pipeline. **Environment B** (8
 - Retrieval augmentation (Story 7.2): `retrieve_related()` pulls 3–5 prior Items with overlapping Topic **and** same authority within 3 years; gold-standard `InterpretationExample`s (optional `config/interpretation_examples.yaml`) are injected as few-shot by Topic; the Client Context Document (optional `config/client_context.md`) grounds the system prompt; cold start proceeds on it alone. The runner passes its `known` Items in for retrieval.
 - Model escalation (Story 7.3): `escalation_model` when topic ∈ config `topic_in` **or** the Item is `specialist_needed` (flagged by triage — the fix for the old pre-interpretation check); all model ids from `interpretation_config.yaml`, every call metered.
 
+**Epic 8 (Human Review Workflows & Feedback) — implemented and tested** (FR-13/14/15/18/22, AD-6/11):
+- `pipeline/review.py` — the legal team's daily loop as deterministic HUMAN-actor logic: `assign_reviewer` (expertise-first, then least-loaded); **WF1** `relevance_review` (A/B, wrapping the Epic 6 retention promote/downgrade, stamping decision/reviewer/timestamps); **WF2** `approve_interpretation` / `edit_and_approve` (captures the field diff into `review_feedback`) / `reject_and_redo` + `regenerate_after_reject` (re-interprets with the reviewer notes fed back) / `escalate`, plus `wf2_sla` (24h if `action_signal == immediate`, else 3 business days); **WF3** `set_client_action` (+ `track_deadline` reminder via alerting).
+- Bidirectional edits + reclassify (Story 8.4, AD-11): `apply_reviewer_edit` validates any status change through the state machine (illegal → raises); `reclassify_b_to_a` re-fetches full text and **hydrates it in place on the existing `page_id` — never mints a new Item even if the hash differs** — then enqueues (or runs) interpretation.
+- `agents/quality_observer.py` (Story 8.5) — the weekly `QualityObserver.run(items, ledger)` computes SM-1..SM-7 + tagging-coverage against the spec §9.5 thresholds, fires alerts on breaches, and returns a retro (optional metered Greek narrative). `business_days_between` helper for the SLA metrics.
+- New Item Group-4 review fields (reviewer, review timestamps, `review_feedback`, client-action fields, `reclassified_from_b`, metric anchors); `interpret` now stamps `draft_created_at`.
+
 ## Run it
 
 `uv` was not installed on the current machine; use the project venv directly (see setup below). With `uv` present, `uv run --extra dev python -m pytest -q` also works.
 
 ```bash
-.venv/Scripts/python -m pytest -q     # 123 tests, all green
+.venv/Scripts/python -m pytest -q     # 145 tests, all green
 .venv/Scripts/python -m legal_intel   # walking skeleton end-to-end (offline)
 ```
 
@@ -82,7 +88,15 @@ Expected skeleton run: 4 fake events ingested → **3 Items** (one duplicate mer
 
 ## Next step
 
-**Epic 8 — Human Review Workflows & Feedback** (the legal team's daily loop in Notion — the last epic). Stories: 8.1 WF1 Class C relevance review (the `promote_class_c_to_a`/`downgrade_class_c_to_b` retention actions from Epic 6 already exist — wire them to the "Pending Relevance Review" queue + SLA/`overdue`), 8.2 WF2 interpretation review with feedback capture (Approve / Edit+Approve capturing the field diff / Reject+Redo regenerating with notes / Escalate; SLA 3 business days, 24h when `action_signal == immediate`; topic-based routing), 8.3 WF3 client-impact & action planning (Client Action Status + Track-Deadline reminders), 8.4 bidirectional Notion edits + the B→A reclassify re-fetch (hydrate full text in place on the existing Item id, never mint a new Item — FR-22, AD-11), and 8.5 the weekly **Quality Observer** agent computing SM-1..SM-7 + counter-metrics against thresholds and writing a retro. See `epics.md` → Epic 8. Much of the machinery exists: state-machine human transitions, `dedup.confirm_merge/reject_as_distinct`, retention promote/downgrade, `tagging_coverage`, the cost ledger's monthly report. Epic 8 assembles them into the review flows + metrics.
+**All 9 epics (0–8) are implemented and tested offline — Environment A is feature-complete.** The full FR set (FR-1..FR-22) has landing code with a green 145-test suite, every stage exercised on fake data with pluggable real backends. What remains is **not new pipeline code** but productionization and the separate Environment B track:
+
+1. **Real-source activation** (per source, gated on the PRD §14 open questions): fill each source's `options` in `config/sources.yaml`, flip `enabled: true`, install the `full` extra, provide secrets in `.env`. Tier-2 selectors and the JS-fetcher (Playwright) need verification against live pages (spec §5.2); real Notion write mapping is stubbed in `NotionApiBackend.write_page` (Story 0.5 provisioning) — wire it before `LEGAL_INTEL_NOTION_BACKEND=notion`.
+2. **Ontology workshop** — `config/ontology.yaml` is still a draft placeholder (blocks production tagging quality); all tagging/triage code is data-driven and needs no changes once it's finalized.
+3. **Client Context Document** — drop `config/client_context.md` to lift interpretation cold-start quality (§8.7).
+4. **Scheduler wiring for real cadences** — `platform/scheduler.py` + `adapters/registry.build_enabled_adapters` are ready; connect APScheduler (`full` extra) and the Quality Observer's weekly job.
+5. **Environment B (Cowork agents)** — the 8 on-demand legal-team agents in `cowork-agents.md` are a separate downstream track, not built here. The Env-B data contract (AD-11) fields they consume are all populated on the Item.
+
+See PRD §14/§15 for the open questions + assumptions to confirm with the client before flipping real sources on.
 
 Notes on activation of already-built collection tiers:
 - **Tier-2**: the row/link/id selectors in `sources.yaml` are best-effort defaults — verify each against the live page (spec §5.2). JS-heavy sites (ΣτΕ, RASFF scrape mode) need a Playwright-backed fetcher injected into the `ScrapeClient`; the default fetcher is static-HTML httpx.
