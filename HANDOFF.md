@@ -24,7 +24,7 @@ This repo is **Environment A** — the production pipeline. **Environment B** (8
 - **Scope: Environment A only** this track.
 - **Paradigm: pipes-and-filters over a Notion blackboard** — each stage is an idempotent filter reading Items in one `status` and writing them in the next; `status` is the only coordination pipe (AD-1). Notion's lack of coordination primitives is handled explicitly by AD-13..AD-16 (single-consumer statuses, key-serialized upserts, dedup-owned precedence, no silent late mutation).
 
-## Status: Phase 0 ✅ + Epic 1 ✅ + Epic 2 ✅ + Epic 3 ✅
+## Status: Phase 0 ✅ + Epics 1–4 ✅
 
 **Epic 0 (walking skeleton)** — the full flow runs offline on fake data:
 `src/legal_intel/` = core contracts (models, state machine, config-as-data, `NotionGateway` with upsert-by-key idempotency, `MeteredLLMClient`), the pipeline (normalize → dedup → tag → triage → interpret), and platform services (scheduler, cost ledger, logging, alerting, scraping politeness). Backends are pluggable — local store + fake LLM by default (offline), real Notion/Anthropic lazy-imported for later.
@@ -49,12 +49,17 @@ This repo is **Environment A** — the production pipeline. **Environment B** (8
 - Registry is now **tier-aware** — Tier-1 adapters get an `HttpClient`, Tier-2 scrapers a `ScrapeClient`. sources.yaml gained ΣτΕ/ΕπΑντ/dpa.gr entries + adapter keys/options for all six (selectors are best-effort defaults to verify against the live pages).
 - Fixed a latent Phase-0 bug: `Alerter.fire()` collided with the logger's fixed `source`/`error` columns whenever a caller passed them (the runner + scheduler alert paths did) — now consumed from context.
 
+**Epic 4 (Tier-3 Collection — commercial inbox) — implemented and tested** (FR-3):
+- `adapters/inbox.py` — `CommercialInboxAdapter` (tier 3) reads **only the configured shared inbox** (`legal-intel@…`), via an injected `MailboxReader` seam (`ImapMailboxReader` in prod — lazy imaplib, creds from the secret store; fixtures in tests). It refuses to read at all without an explicit `inbox_address` — there is no path to a personal mailbox. It parses each email (HTML links via a stdlib extractor, or bare URLs from plain text), fetches each link's content via the Tier-1 `HttpClient` (best-effort), and yields SourceRecords marked `commercial: true` with the newsletter's editorial in `external_commentary`.
+- Sender→source mapping is config (`sender_source_map`); every commercial source is `authority_rank: 3`, so Epic 2's merge guarantees a commercial record never wins metadata over an official Source (covered by a test) while its editorial is preserved.
+- Registry gained the `inbox` key (tier-3 → `HttpClient`); `sources.yaml` gained a `Commercial Inbox` source (disabled).
+
 ## Run it
 
 `uv` was not installed on the current machine; use the project venv directly (see setup below). With `uv` present, `uv run --extra dev python -m pytest -q` also works.
 
 ```bash
-.venv/Scripts/python -m pytest -q     # 83 tests, all green
+.venv/Scripts/python -m pytest -q     # 90 tests, all green
 .venv/Scripts/python -m legal_intel   # walking skeleton end-to-end (offline)
 ```
 
@@ -62,9 +67,11 @@ Expected skeleton run: 4 fake events ingested → **3 Items** (one duplicate mer
 
 ## Next step
 
-**Epic 4 — Tier-3 Collection (commercial inbox)**: a shared-inbox newsletter parser (`legal-intel@…`, IMAP or API — never a personal mailbox) that extracts links, fetches content, and yields SourceRecords marked as a commercial source. Commercial records must never win metadata over an official source on merge (the authority hierarchy from Epic 2 already enforces this via `authority_rank`), and their editorial goes to `external_commentary`. See `epics.md` → Epic 4 (single story 4.1). Build it offline-testable: inject the IMAP/fetch seam, feed fixture emails. (Then Epic 5 tagging, Epic 6 triage, Epic 7 interpretation, Epic 8 review workflows.)
+**Epic 5 — Topic Tagging**: `pipeline/tag.py` already does rule-based Ontology keyword tagging (Phase 0). Epic 5 completes it: Story 5.1 tightens rule-based tagging (EuroVoc pre-filter for EUR-Lex items, >90% coverage gate, only Ontology-defined Topics) and Story 5.2 adds the **LLM edge-case tagger** via the `MeteredLLMClient` for Items no rule tags, with its output validated against the Ontology before persist (AD-7). See `epics.md` → Epic 5. Note: `config/ontology.yaml` is still a **draft placeholder** pending the client's 90-min ontology workshop (a PRD open question) — Epic 5 code is data-driven so it works against whatever the workshop finalizes. (Then Epic 6 triage, Epic 7 interpretation, Epic 8 review workflows.)
 
-Note on Tier-2 activation: the row/link/id selectors in `sources.yaml` are best-effort defaults — verify each against the live page (spec §5.2). JS-heavy sites (ΣτΕ, RASFF scrape mode) need a Playwright-backed fetcher injected into the `ScrapeClient`; the default fetcher is static-HTML httpx.
+Notes on activation of already-built collection tiers:
+- **Tier-2**: the row/link/id selectors in `sources.yaml` are best-effort defaults — verify each against the live page (spec §5.2). JS-heavy sites (ΣτΕ, RASFF scrape mode) need a Playwright-backed fetcher injected into the `ScrapeClient`; the default fetcher is static-HTML httpx.
+- **Tier-3 inbox**: set `inbox_address` + IMAP creds (env vars named in options) and enable the `Commercial Inbox` source; it reads only that shared mailbox.
 
 Continue with the BMAD implementation flow (`bmad-sprint-planning` → `bmad-create-story` → `bmad-dev-story`) **if BMAD is installed** on this machine (global at `~/.claude/_bmad`; reinstall v6.10.0 if absent). If BMAD isn't available, just implement directly from `epics.md` — the code is independent of BMAD.
 

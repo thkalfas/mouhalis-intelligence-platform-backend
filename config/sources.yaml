@@ -226,3 +226,27 @@ sources:
     cadence: "daily@11:00"
     authority_rank: 3
     enabled: false
+
+  # --- Tier 3 commercial shared inbox — authority_rank 3 (never wins metadata) ---
+  # Reads ONLY the dedicated shared inbox; newsletters are BCC-forwarded here so
+  # the legal counsel's personal mailbox is never touched (spec §5.3).
+  - name: Commercial Inbox
+    tier: 3
+    endpoint: "imap://imap.example.com"
+    cadence: "30m"   # inbox trigger in prod; poll fallback
+    authority_rank: 3
+    enabled: false
+    adapter: inbox
+    options:
+      inbox_address: "legal-intel@client-domain.gr"
+      imap_host_env: LEGAL_INTEL_IMAP_HOST
+      imap_password_env: LEGAL_INTEL_IMAP_PASSWORD
+      default_source_name: "Commercial Newsletter"
+      default_type: Newsletter
+      max_links_per_email: 20
+      link_allow_domains: []   # optional allowlist of publisher domains
+      sender_source_map:
+        "taxheaven.gr": "taxheaven.gr"
+        "qualex": "Qualex"
+        "nb.org": "NB Daily"
+        "lawspot": "Lawspot"

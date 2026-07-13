@@ -38,6 +38,8 @@ _REGISTRY: dict[str, str] = {
     "dpa": "legal_intel.adapters.tier2:HtmlListScraper",
     "epant": "legal_intel.adapters.epant:EpantScraper",
     "rasff": "legal_intel.adapters.rasff:RasffAdapter",
+    # Tier 3
+    "inbox": "legal_intel.adapters.inbox:CommercialInboxAdapter",
 }
 
 Client = Union[HttpClient, ScrapeClient]
