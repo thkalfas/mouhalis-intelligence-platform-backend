@@ -24,7 +24,7 @@ This repo is **Environment A** — the production pipeline. **Environment B** (8
 - **Scope: Environment A only** this track.
 - **Paradigm: pipes-and-filters over a Notion blackboard** — each stage is an idempotent filter reading Items in one `status` and writing them in the next; `status` is the only coordination pipe (AD-1). Notion's lack of coordination primitives is handled explicitly by AD-13..AD-16 (single-consumer statuses, key-serialized upserts, dedup-owned precedence, no silent late mutation).
 
-## Status: Phase 0 ✅ + Epic 1 ✅ + Epic 2 ✅
+## Status: Phase 0 ✅ + Epic 1 ✅ + Epic 2 ✅ + Epic 3 ✅
 
 **Epic 0 (walking skeleton)** — the full flow runs offline on fake data:
 `src/legal_intel/` = core contracts (models, state machine, config-as-data, `NotionGateway` with upsert-by-key idempotency, `MeteredLLMClient`), the pipeline (normalize → dedup → tag → triage → interpret), and platform services (scheduler, cost ledger, logging, alerting, scraping politeness). Backends are pluggable — local store + fake LLM by default (offline), real Notion/Anthropic lazy-imported for later.
@@ -42,12 +42,19 @@ This repo is **Environment A** — the production pipeline. **Environment B** (8
 - **AD-15 supersession** — a superseding version (e.g. an EUR-Lex corrigendum, carried via `raw_metadata.supersedes_ref` → `Item.supersedes_ref`) becomes a distinct Item that links `supersedes` to its predecessor, inherits its Topics, and drives the predecessor through `Superseded`.
 - **Dedup-confirmation queue** — `dedup.confirm_merge()` / `reject_as_distinct()` (HUMAN actor) resolve `Awaiting Dedup Confirmation` items.
 
+**Epic 3 (Tier-2 Collection — scraping) — implemented and tested** (FR-2, AD-10):
+- `platform/scrape_client.py` — the single choke point for all Tier-2 requests. Layers the Phase-0 `PolitenessMiddleware` into a real fetch flow: ≤1 req/5s per domain + ±30% jitter, non-identifying rotating UA, robots.txt respect (fail-open), max-1-concurrent-per-domain lock, backoff 2/4/8/16/32s, circuit breaker (3× 429/503 in 5min → 30min pause). Fetcher/clock/sleep/jitter/UA are injectable seams → fully offline-tested; the default fetcher is lazy-httpx (a Playwright fetcher can be injected for JS-heavy sites).
+- `adapters/tier2.py` — `RowExtractor` (stdlib HTML row parser, no bs4), `Tier2Scraper` base (fetches only via the ScrapeClient; a zero-row listing is a *degraded* run that fires an ops alert, never a silent empty-success; content-hash change-detection short-circuits unchanged listings), and the config-driven `HtmlListScraper`.
+- Six scrapers (Story 3.3): `fek`/`ste`/`efet`/`dpa` are `HtmlListScraper` + config; ΕΦΕΤ parses product+hazard from titles (`detect_hazard`, config keyword map); `EpantScraper` is the weekly direct cross-check (primary ΕπΑντ coverage is the Δι@ύγεια source with the ΕπΑντ org UID); `RasffAdapter` selects `apitalks` (paid JSON via HttpClient) vs `scrape` per config.
+- Registry is now **tier-aware** — Tier-1 adapters get an `HttpClient`, Tier-2 scrapers a `ScrapeClient`. sources.yaml gained ΣτΕ/ΕπΑντ/dpa.gr entries + adapter keys/options for all six (selectors are best-effort defaults to verify against the live pages).
+- Fixed a latent Phase-0 bug: `Alerter.fire()` collided with the logger's fixed `source`/`error` columns whenever a caller passed them (the runner + scheduler alert paths did) — now consumed from context.
+
 ## Run it
 
 `uv` was not installed on the current machine; use the project venv directly (see setup below). With `uv` present, `uv run --extra dev python -m pytest -q` also works.
 
 ```bash
-.venv/Scripts/python -m pytest -q     # 69 tests, all green
+.venv/Scripts/python -m pytest -q     # 83 tests, all green
 .venv/Scripts/python -m legal_intel   # walking skeleton end-to-end (offline)
 ```
 
@@ -55,7 +62,9 @@ Expected skeleton run: 4 fake events ingested → **3 Items** (one duplicate mer
 
 ## Next step
 
-**Epic 3 — Tier-2 Collection (scraping)**: the shared scraping-politeness middleware (`platform/politeness.py` already holds the policy object from Phase 0 — Epic 3 adds the enforcing HTTP wrapper on top of it, AD-10), change-detection + breakage alerts, and the six Tier-2 scrapers (ΦΕΚ, ΣτΕ, ΕπΑντ, ΕΦΕΤ, RASFF, dpa.gr). See `epics.md` → Epic 3. Note: scrapers need Playwright (`full` extra) and should be built offline-testable the same way the Tier-1 adapters are (inject the fetch seam; fixture HTML). ΕπΑντ prefers the Δι@ύγεια path already built in Epic 1. (Then Epic 4 Tier-3 inbox, Epic 5 tagging, Epic 6 triage, Epic 7 interpretation, Epic 8 review workflows.)
+**Epic 4 — Tier-3 Collection (commercial inbox)**: a shared-inbox newsletter parser (`legal-intel@…`, IMAP or API — never a personal mailbox) that extracts links, fetches content, and yields SourceRecords marked as a commercial source. Commercial records must never win metadata over an official source on merge (the authority hierarchy from Epic 2 already enforces this via `authority_rank`), and their editorial goes to `external_commentary`. See `epics.md` → Epic 4 (single story 4.1). Build it offline-testable: inject the IMAP/fetch seam, feed fixture emails. (Then Epic 5 tagging, Epic 6 triage, Epic 7 interpretation, Epic 8 review workflows.)
+
+Note on Tier-2 activation: the row/link/id selectors in `sources.yaml` are best-effort defaults — verify each against the live page (spec §5.2). JS-heavy sites (ΣτΕ, RASFF scrape mode) need a Playwright-backed fetcher injected into the `ScrapeClient`; the default fetcher is static-HTML httpx.
 
 Continue with the BMAD implementation flow (`bmad-sprint-planning` → `bmad-create-story` → `bmad-dev-story`) **if BMAD is installed** on this machine (global at `~/.claude/_bmad`; reinstall v6.10.0 if absent). If BMAD isn't available, just implement directly from `epics.md` — the code is independent of BMAD.
 

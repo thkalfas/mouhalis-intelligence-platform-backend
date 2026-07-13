@@ -7,14 +7,16 @@ production pipeline that runs headless, collects from ~15 Greek/EU sources,
 deduplicates and classifies each Legal Event, and drafts a structured interpretation
 for the ones that matter. Notion is the single source of truth the legal team works in.
 
-> **Status: Phase 0 ✅ · Epic 1 (Tier-1 adapters) ✅ · Epic 2 (dedup & merge) ✅.**
-> The full flow runs end-to-end offline on *fake* data; the seven real Tier-1
-> adapters (EUR-Lex, Δι@ύγεια, Βουλή, EDPB, EFSA, GDPRhub, data.gov.gr) plus real
-> text extraction are implemented and unit-tested against fixture HTTP; and
-> deduplication now does config-driven weighted scoring, authority-ranked
-> identity-preserving merge, supersession, and a human confirmation queue — all
-> still zero network/tokens. See `_bmad-output/` for the PRD, architecture spine,
-> and the epic/story breakdown that drive the build.
+> **Status: Phase 0 ✅ · Epic 1 (Tier-1) ✅ · Epic 2 (dedup & merge) ✅ · Epic 3
+> (Tier-2 scraping) ✅.** The full flow runs end-to-end offline on *fake* data;
+> the seven real Tier-1 adapters plus real text extraction are implemented;
+> deduplication does config-driven weighted scoring, authority-ranked
+> identity-preserving merge, supersession, and a human confirmation queue; and
+> Tier-2 scraping runs through one politeness-enforcing client (rate-limit,
+> jitter, rotating UA, robots, circuit breaker) with zero-row breakage alerts and
+> six config-driven scrapers (ΦΕΚ, ΣτΕ, ΕπΑντ, ΕΦΕΤ, RASFF, dpa.gr). All of it is
+> unit-tested against fixtures — still zero network/tokens. See `_bmad-output/`
+> for the PRD, architecture spine, and the epic/story breakdown that drive the build.
 
 ## Architecture in one line
 
@@ -41,7 +43,7 @@ Runs offline — no Notion token or API key needed (local backend + fake LLM).
 # venv + pip (works everywhere; .venv/ is machine-local — recreate on new checkouts)
 python -m venv .venv
 .venv/Scripts/python -m pip install -e ".[dev]"   # Windows; on POSIX use .venv/bin/python
-.venv/Scripts/python -m pytest -q                 # run the test suite (69 tests)
+.venv/Scripts/python -m pytest -q                 # run the test suite (83 tests)
 .venv/Scripts/python -m legal_intel               # walking skeleton end-to-end
 
 # or, if uv is installed
@@ -73,7 +75,7 @@ by their backends and ship in the `full` extra: `pip install -e ".[full]"`.
 
 ## What's next
 
-Epic 3 (Tier-2 scraping) onward — see
+Epic 4 (Tier-3 commercial inbox) onward — see
 [`_bmad-output/planning-artifacts/epics.md`](_bmad-output/planning-artifacts/epics.md)
 and `HANDOFF.md` for the current state and the next step. Continue with the BMAD
 implementation flow (`bmad-sprint-planning` → `bmad-create-story` →

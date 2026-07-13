@@ -114,24 +114,102 @@ sources:
       dataset: ""
 
   # --- Tier 2 (scraping) — authority_rank 1 (official sites) ---
+  # Row/link/id selectors below are best-effort defaults; each MUST be verified
+  # against the live page at activation (spec §5.2). All routing is via the
+  # politeness-enforcing ScrapeClient (AD-10).
   - name: ΦΕΚ
     tier: 2
     endpoint: "https://search.et.gr/en/"
     cadence: "12h"
     authority_rank: 1
     enabled: false
+    adapter: fek
+    options:
+      row_tag: div
+      row_class: result-item
+      link_contains: ".pdf"
+      default_type: ΦΕΚ
+      authority: Εθνικό Τυπογραφείο
+
+  - name: ΣτΕ
+    tier: 2
+    endpoint: "https://www.adjustice.gr/webcenter/portal/ste/ypiresies/nomologies"
+    cadence: "daily@22:00"
+    authority_rank: 1
+    enabled: false
+    adapter: ste
+    options:
+      row_tag: tr
+      default_type: Απόφαση ΣτΕ
+      authority: Συμβούλιο της Επικρατείας
+
+  - name: ΕπΑντ
+    tier: 2
+    endpoint: "https://www.epant.gr/apofaseis-gnomodotiseis.html"
+    cadence: "weekly@Mon09:00"   # weekly direct cross-check; primary path is Δι@ύγεια
+    authority_rank: 1
+    enabled: false
+    adapter: epant
+    options:
+      row_tag: div
+      row_class: item
+      default_type: Απόφαση ΕπΑντ
+      authority: Επιτροπή Ανταγωνισμού
+      note: "Primary coverage is via the Διαύγεια source with the ΕπΑντ org UID."
+
   - name: ΕΦΕΤ
     tier: 2
-    endpoint: "https://www.efet.gr"
+    endpoint: "https://www.efet.gr/index.php/el/enimerosi/deltia-typou/anakleiseis-cat"
     cadence: "4h"
     authority_rank: 1
     enabled: false
+    adapter: efet
+    options:
+      row_tag: div
+      row_class: item
+      default_type: Ανάκληση
+      authority: ΕΦΕΤ
+      parse_hazard: true
+      hazards:
+        - {keyword: "listeria", label: "Listeria"}
+        - {keyword: "salmonella", label: "Salmonella"}
+        - {keyword: "υδράργυρ", label: "Υδράργυρος"}
+        - {keyword: "αλλεργιογ", label: "Αλλεργιογόνο"}
+        - {keyword: "μυκοτοξ", label: "Μυκοτοξίνες"}
+
   - name: RASFF
     tier: 2
     endpoint: "https://webgate.ec.europa.eu/rasff-window/screen/list"
     cadence: "4h"
     authority_rank: 1
     enabled: false
+    adapter: rasff
+    options:
+      mechanism: apitalks   # "apitalks" (paid REST) | "scrape" (JS-capable fetcher)
+      apitalks_endpoint: ""
+      apitalks_key_header: "x-api-key"
+      apitalks_key: ""
+      default_type: RASFF Notification
+      authority: RASFF
+      hazards:
+        - {keyword: "pathogenic", label: "Pathogens"}
+        - {keyword: "listeria", label: "Listeria"}
+        - {keyword: "heavy metal", label: "Heavy metals"}
+        - {keyword: "mycotoxin", label: "Mycotoxins"}
+        - {keyword: "allergen", label: "Allergens"}
+
+  - name: dpa.gr
+    tier: 2
+    endpoint: "https://www.dpa.gr/el/enimerwtiko/prakseisArxis"
+    cadence: "weekly@Tue09:00"
+    authority_rank: 1
+    enabled: false
+    adapter: dpa
+    options:
+      row_tag: div
+      row_class: item
+      default_type: Πράξη ΑΠΔΠΧ
+      authority: ΑΠΔΠΧ
 
   # --- Official aggregators — authority_rank 2 ---
   - name: kodiko.gr

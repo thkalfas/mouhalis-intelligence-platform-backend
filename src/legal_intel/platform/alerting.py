@@ -24,10 +24,14 @@ class Alerter:
 
     def fire(self, level: AlertLevel, message: str, **context) -> None:
         self.alerts.append((level, message, context))
+        # `source`/`error` are fixed log columns — let callers supply them via
+        # context without colliding with the logger's own keyword arguments.
+        log_ctx = dict(context)
+        source = log_ctx.pop("source", "alerting")
+        error = log_ctx.pop("error", message if level is AlertLevel.CRITICAL else None)
         get_logger().log(
-            source="alerting", event="alert", status=level.value,
-            error=message if level is AlertLevel.CRITICAL else None,
-            **context,
+            source=source, event="alert", status=level.value, error=error,
+            **log_ctx,
         )
         if self._dispatch:
             self._dispatch(level, message, context)
