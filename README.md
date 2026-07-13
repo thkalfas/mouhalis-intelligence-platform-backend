@@ -7,10 +7,12 @@ production pipeline that runs headless, collects from ~15 Greek/EU sources,
 deduplicates and classifies each Legal Event, and drafts a structured interpretation
 for the ones that matter. Notion is the single source of truth the legal team works in.
 
-> **Status: Phase 0 — walking skeleton.** The full flow runs end-to-end on *fake*
-> data with an offline Notion backend and a fake LLM, proving the architecture before
-> real connectors are built. See `_bmad-output/` for the PRD, architecture spine, and
-> the epic/story breakdown that drive the build.
+> **Status: Phase 0 walking skeleton ✅ + Epic 1 (Tier-1 adapters) ✅.** The full
+> flow runs end-to-end offline on *fake* data, and the seven real Tier-1 adapters
+> (EUR-Lex, Δι@ύγεια, Βουλή, EDPB, EFSA, GDPRhub, data.gov.gr) plus real text
+> extraction are implemented and unit-tested against fixture HTTP (still zero
+> network/tokens). See `_bmad-output/` for the PRD, architecture spine, and the
+> epic/story breakdown that drive the build.
 
 ## Architecture in one line
 
@@ -34,14 +36,15 @@ config/    → business rules as data (sources, ontology, relevance rules, inter
 Runs offline — no Notion token or API key needed (local backend + fake LLM).
 
 ```bash
-# with uv (recommended)
-uv run --extra dev python -m pytest -q      # run the test suite
-uv run python -m legal_intel                # run the walking skeleton end-to-end
+# venv + pip (works everywhere; .venv/ is machine-local — recreate on new checkouts)
+python -m venv .venv
+.venv/Scripts/python -m pip install -e ".[dev]"   # Windows; on POSIX use .venv/bin/python
+.venv/Scripts/python -m pytest -q                 # run the test suite (54 tests)
+.venv/Scripts/python -m legal_intel               # walking skeleton end-to-end
 
-# or with pip
-pip install -e ".[dev]"
-python -m pytest -q
-python -m legal_intel
+# or, if uv is installed
+uv run --extra dev python -m pytest -q
+uv run python -m legal_intel
 ```
 
 Expected: 4 fake Legal Events ingested → **3 Items** in the store (the cross-source
@@ -68,7 +71,13 @@ by their backends and ship in the `full` extra: `pip install -e ".[full]"`.
 
 ## What's next
 
-Epic 1 (Tier-1 adapters) onward — see
-[`_bmad-output/planning-artifacts/epics.md`](_bmad-output/planning-artifacts/epics.md).
-Continue with the BMAD implementation flow (`bmad-sprint-planning` →
-`bmad-create-story` → `bmad-dev-story`) per story.
+Epic 2 (Deduplication & Merge) onward — see
+[`_bmad-output/planning-artifacts/epics.md`](_bmad-output/planning-artifacts/epics.md)
+and `HANDOFF.md` for the current state and the next step. Continue with the BMAD
+implementation flow (`bmad-sprint-planning` → `bmad-create-story` →
+`bmad-dev-story`) per story, or implement directly from `epics.md`.
+
+To **activate** a real Tier-1 source: fill its `options:` in `config/sources.yaml`
+(org UIDs, dataset, etc.), set `enabled: true`, install the `full` extra
+(`pip install -e ".[full]"` for `httpx`/`pdfplumber`), and provide any secrets in
+`.env`. The adapters are already wired via `adapters/registry.py`.

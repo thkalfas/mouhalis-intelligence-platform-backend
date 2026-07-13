@@ -48,6 +48,10 @@ class SourceConfig(BaseModel):
     authority_rank: int  # lower = more authoritative (AD-8, L1 fix)
     enabled: bool = True
     adapter: str = ""  # dotted path or key; "fake" for Phase 0
+    #: Adapter-specific parameters kept as data (AD-8): lookback windows, EuroVoc
+    #: descriptors, org UIDs, RSS urls, api-key env var, resource types, etc.
+    #: Adapters read these; code never hard-codes them.
+    options: dict[str, Any] = Field(default_factory=dict)
 
 
 class Topic(BaseModel):

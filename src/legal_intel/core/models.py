@@ -116,6 +116,12 @@ class SourceRecord(BaseModel):
     date_effective: Optional[date] = None
     url: str
     full_text: Optional[str] = None
+    #: Raw body when text is not already plain (PDF/HTML), extracted by
+    #: ``pipeline.normalize`` so extraction stays a single filter (FR-4). Adapters
+    #: — the only code that talks to the outside world — download it; they never
+    #: extract. Pre-normalization only; never persisted.
+    raw_body: Optional[bytes] = None
+    content_type: Optional[str] = None
     language: Optional[str] = None
     raw_metadata: dict[str, Any] = Field(default_factory=dict)
     collected_at: datetime = Field(
@@ -156,6 +162,10 @@ class Item(BaseModel):
     language: Optional[str] = None
     snippet: Optional[str] = None
     hash: Optional[str] = None
+    #: A scanned PDF with no text layer was detected; text extraction produced
+    #: nothing and the item is flagged for OCR (future work) rather than silently
+    #: persisted as empty (Story 1.1).
+    needs_ocr: bool = False
 
     # Group 3 — interpretation (A only)
     interpretation: Optional[Interpretation] = None

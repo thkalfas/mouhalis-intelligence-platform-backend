@@ -1,25 +1,30 @@
 """Normalization filter (Story 1.1, FR-4).
 
-Maps a SourceRecord to a unified Item: text extraction is assumed already-plain
-here (Tier-1 adapters extract; the PDF/HTML extractors land in Epic 1/3), computes
-the SHA-256 hash (AD-4 key component), a snippet, and applies the data-quality gate.
+Maps a SourceRecord to a unified Item and is the single place raw bodies become
+plain text: adapters download PDF/HTML into ``raw_body`` (they are the only code
+that talks to the outside world) and normalization extracts it here, so every
+downstream stage sees one clean schema regardless of source. Computes the SHA-256
+hash (AD-4 key component), a snippet, detects language (el/en/other), and applies
+the data-quality gate.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from ..core.errors import PermanentError
 from ..core.models import Item, SourceRecord, text_hash
+from .extract import detect_language, extract_text
 
 SNIPPET_CHARS = 500
 
 
-def _detect_language(text: str, hint: Optional[str]) -> str:
-    if hint:
-        return hint
-    # Cheap heuristic sufficient for Phase 0; real detection in Epic 1.
-    greek = sum(1 for ch in text if "Ͱ" <= ch <= "Ͽ")
-    return "el" if greek > len(text) * 0.2 else "en"
+def _resolve_text(record: SourceRecord) -> tuple[str, bool]:
+    """Return (full_text, needs_ocr). Prefer already-plain text; otherwise
+    extract from the raw body the adapter downloaded."""
+    if record.full_text:
+        return record.full_text, False
+    if record.raw_body is not None:
+        result = extract_text(record.raw_body, record.content_type)
+        return result.text, result.needs_ocr
+    return "", False
 
 
 def normalize(record: SourceRecord) -> Item:
@@ -30,7 +35,9 @@ def normalize(record: SourceRecord) -> Item:
             f"Data-quality gate: missing title/date/url for {record.dedup_key()}"
         )
 
-    full_text = record.full_text or ""
+    full_text, needs_ocr = _resolve_text(record)
+    text_for_lang = full_text or record.title
+
     item = Item(
         source_id=record.source_id,
         source_name=record.source_name,
@@ -41,9 +48,10 @@ def normalize(record: SourceRecord) -> Item:
         date_effective=record.date_effective,
         url=record.url,
         full_text=full_text or None,
-        language=_detect_language(full_text or record.title, record.language),
+        language=detect_language(text_for_lang, record.language),
         snippet=(full_text[:SNIPPET_CHARS] or None) if full_text else None,
         hash=text_hash(full_text or record.title),
+        needs_ocr=needs_ocr,
         collected_at=record.collected_at,
     )
     # Preserve any editorial the source carried, for the interpretation stage.

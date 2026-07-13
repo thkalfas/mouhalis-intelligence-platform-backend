@@ -24,32 +24,45 @@ This repo is **Environment A** — the production pipeline. **Environment B** (8
 - **Scope: Environment A only** this track.
 - **Paradigm: pipes-and-filters over a Notion blackboard** — each stage is an idempotent filter reading Items in one `status` and writing them in the next; `status` is the only coordination pipe (AD-1). Notion's lack of coordination primitives is handled explicitly by AD-13..AD-16 (single-consumer statuses, key-serialized upserts, dedup-owned precedence, no silent late mutation).
 
-## Status: Phase 0 complete ✅
+## Status: Phase 0 ✅ + Epic 1 ✅
 
-**Epic 0 (walking skeleton) is implemented and tested** — the full flow runs offline on fake data:
+**Epic 0 (walking skeleton)** — the full flow runs offline on fake data:
 `src/legal_intel/` = core contracts (models, state machine, config-as-data, `NotionGateway` with upsert-by-key idempotency, `MeteredLLMClient`), the pipeline (normalize → dedup → tag → triage → interpret), and platform services (scheduler, cost ledger, logging, alerting, scraping politeness). Backends are pluggable — local store + fake LLM by default (offline), real Notion/Anthropic lazy-imported for later.
+
+**Epic 1 (Tier-1 real adapters) — implemented and tested** (FR-1, FR-4):
+- `pipeline/extract.py` — real text extraction (pdfplumber for PDF, stdlib HTML→text), scanned-PDF `needs_ocr` flag, three-way `el/en/other` language detection. `pipeline/normalize.py` now extracts from an adapter-downloaded `raw_body` (adapters download; normalization extracts — the single FR-4 filter).
+- `platform/http.py` — shared Tier-1 `HttpClient`: exponential backoff on 429/5xx (`TransientError`), `PermanentError` on 404. `httpx` lazy-imported by the default transport only; adapters take an injected client so **all adapter tests run offline** against fixtures.
+- `adapters/` — `eurlex` (SPARQL + CELEX REST, EuroVoc pre-filter, corrigendum→`supersedes_ref`), `diavgeia` (opendata search per org UID, PDF download + checksum check), `rss` (config-driven, serves EDPB + EFSA), `vouli`, `gdprhub` (MediaWiki recentchanges + wikitext), `datagovgr` (API key from the secret store). All endpoints/windows/UIDs/descriptors live in `config/sources.yaml` `options:` (AD-8).
+- `adapters/registry.py` — maps the `adapter` key in `sources.yaml` to its class (lazy-imported); the CLI/scheduler build enabled sources from config. Real Tier-1 sources ship `enabled: false` until their prerequisites (below) are signed off.
 
 ## Run it
 
+`uv` was not installed on the current machine; use the project venv directly (see setup below). With `uv` present, `uv run --extra dev python -m pytest -q` also works.
+
 ```bash
-uv run --extra dev python -m pytest -q     # 12 tests, all green
-uv run python -m legal_intel               # walking skeleton end-to-end
+.venv/Scripts/python -m pytest -q     # 54 tests, all green
+.venv/Scripts/python -m legal_intel   # walking skeleton end-to-end (offline)
 ```
 
-Expected: 4 fake events ingested → **3 Items** (one duplicate merged), one each Class **A** (with a draft interpretation), **B** (index-only, no full text), **C** (ambiguous, held for review), plus a cost-ledger report. Re-running is idempotent.
+Expected skeleton run: 4 fake events ingested → **3 Items** (one duplicate merged), one each Class **A** (with a draft interpretation), **B** (index-only, no full text), **C** (ambiguous, held for review), plus a cost-ledger report. Re-running is idempotent.
 
 ## Next step
 
-**Epic 1 — Tier-1 real adapters** (EUR-Lex, Δι@ύγεια, Βουλή, EDPB, EFSA, GDPRhub, data.gov.gr) + normalization/text-extraction. See `epics.md` → Epic 1 for the stories and acceptance criteria.
+**Epic 2 — Deduplication & Merge** (weighted duplicate scoring, authority-ranked merge, `supersedes`/precedent relations + dedup-confirmation queue). See `epics.md` → Epic 2. The dedup filter already exists as a Phase-0 stub in `pipeline/dedup.py` — Epic 2 makes it weighted and authority-aware per FR-5 / AD-14/15/16. (Then Epic 3 Tier-2 scrapers, Epic 4 Tier-3 inbox, etc.)
 
 Continue with the BMAD implementation flow (`bmad-sprint-planning` → `bmad-create-story` → `bmad-dev-story`) **if BMAD is installed** on this machine (global at `~/.claude/_bmad`; reinstall v6.10.0 if absent). If BMAD isn't available, just implement directly from `epics.md` — the code is independent of BMAD.
 
 ## Prerequisites / setup on a new machine
 
-1. **Python 3.12** and **`uv`** installed.
+1. **Python 3.10+** (3.13 works). `uv` is nice-to-have but optional — plain `venv` + `pip` is enough.
 2. This folder (cloned or copied).
-3. *(Optional)* BMAD reinstalled — only to keep running the workflow skills + `memlog.py`/`lint_spine.py` helpers.
-4. **`.env`** from `.env.example` — only when starting Epic 1's real connectors (Notion token, Anthropic key). Phase 0 needs none.
+3. **Recreate the venv** — `.venv/` does not travel between machines (it hard-codes an absolute interpreter path from wherever it was created). On a fresh checkout:
+   ```bash
+   python -m venv .venv
+   .venv/Scripts/python -m pip install -e ".[dev]"   # offline path; add "[full]" for real connectors
+   ```
+4. *(Optional)* BMAD reinstalled — only to keep running the workflow skills + `memlog.py`/`lint_spine.py` helpers.
+5. **`.env`** from `.env.example` — only when *activating* real connectors (Notion token, Anthropic key, `DATA_GOV_GR_API_KEY`). The offline pipeline + all tests need none — real adapters are exercised in tests via injected fixture HTTP.
 
 ## Open questions blocking real connectors (need client input — PRD §14)
 

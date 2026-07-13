@@ -1,6 +1,8 @@
 # Source registry (AD-8). tier, endpoint, cadence, authority_rank (lower = more
-# authoritative, used as the dedup merge tie-breaker — AD-8 / L1 fix).
-# Phase 0 enables only the FakeSource; real adapters flip `enabled: true` in Epic 1+.
+# authoritative, used as the dedup merge tie-breaker — AD-8 / L1 fix), plus an
+# `adapter` key (resolved via adapters/registry.py) and adapter-specific
+# `options` kept as data. Only FakeSource is enabled by default; real Tier-1
+# adapters flip `enabled: true` once their credentials/cadence are signed off.
 sources:
   - name: FakeSource
     tier: 1
@@ -17,36 +19,99 @@ sources:
     cadence: "30m"
     authority_rank: 1
     enabled: false
+    adapter: eurlex
+    options:
+      lookback_days: 7
+      language: ENG
+      limit: 100
+      resource_types: [REG, DIR, JUDG, ORDER, OPIN_JUR]
+      # EuroVoc pre-filter for the client's compliance domains (spec §5.1.1).
+      eurovoc_descriptors:
+        - tobacco industry
+        - manufactured tobacco
+        - excise duty
+        - foodstuff
+        - food safety
+        - food labelling
+        - food additive
+        - personal data protection
+        - sustainable development
+        - corporate social responsibility
+        - competition law
+        - restrictive-trade practice
+        - distribution agreement
+
   - name: Διαύγεια
     tier: 1
     endpoint: "https://diavgeia.gov.gr/opendata"
     cadence: "6h"
     authority_rank: 1
     enabled: false
+    adapter: diavgeia
+    options:
+      lookback_days: 7
+      page_size: 100
+      # Organization UIDs need verification at implementation (spec §5.1.3):
+      # ΕπΑντ, ΑΑΔΕ, ΕΦΕΤ, ΑΠΔΠΧ + the client's competent ministries.
+      organization_uids: []
+
   - name: Βουλή
     tier: 1
     endpoint: "https://www.hellenicparliament.gr/api.ashx"
     cadence: "daily@08:00"
     authority_rank: 1
     enabled: false
+    adapter: vouli
+    options:
+      method: Bills
+      period: 20
+      default_type: Νομοσχέδιο
+
   - name: EDPB
     tier: 1
     endpoint: "https://www.edpb.europa.eu/rss/documents_en.rss"
     cadence: "daily@09:00"
     authority_rank: 1
     enabled: false
+    adapter: rss
+    options:
+      authority: EDPB
+      default_type: Publication
+
   - name: EFSA
     tier: 1
     endpoint: "https://www.efsa.europa.eu/en/rss/all"
     cadence: "daily@09:00"
     authority_rank: 1
     enabled: false
+    adapter: rss
+    options:
+      authority: EFSA
+      default_type: Scientific Output
+
   - name: GDPRhub
     tier: 1
     endpoint: "https://gdprhub.eu/api.php"
     cadence: "daily@10:00"
     authority_rank: 2
     enabled: false
+    adapter: gdprhub
+    options:
+      namespace: 0
+      limit: 50
+      authority: GDPRhub
+      default_type: DPA Decision
+
+  - name: data.gov.gr
+    tier: 1
+    endpoint: "https://data.gov.gr/api/v1"
+    cadence: "daily@10:00"
+    authority_rank: 2
+    enabled: false
+    adapter: datagovgr
+    options:
+      api_key_env: DATA_GOV_GR_API_KEY
+      dataset: ""
 
   # --- Tier 2 (scraping) — authority_rank 1 (official sites) ---
   - name: ΦΕΚ

@@ -8,21 +8,42 @@ with no token or network — the Phase-0 validation gate.
 from __future__ import annotations
 
 import json
+import sys
 
-from .adapters.fake import FakeSourceAdapter
+# Greek titles must print on any console; Windows defaults to cp1252 and would
+# otherwise crash on the first Greek character. Force UTF-8 on stdout/stderr.
+for _stream in (sys.stdout, sys.stderr):
+    reconfigure = getattr(_stream, "reconfigure", None)
+    if reconfigure is not None:
+        reconfigure(encoding="utf-8")
+
+from .adapters.registry import build_enabled_adapters
 from .core.models import Item
 from .pipeline.runner import PipelineRunner
 
 
 def main() -> None:
     runner = PipelineRunner()
-    report = runner.run(FakeSourceAdapter())
+    # Config-driven wiring (AD-3, AD-8): run whichever sources are enabled in
+    # sources.yaml. Offline, that is just FakeSource; enabling a real Tier-1
+    # adapter is a config flip (plus its network prerequisites).
+    adapters = build_enabled_adapters(runner.cfg)
+    ingested = persisted = errors = 0
+    by_class: dict[str, int] = {}
+    for adapter in adapters:
+        report = runner.run(adapter)
+        ingested += report.ingested
+        persisted += report.persisted
+        errors += report.errors
+        for cls, n in report.by_class.items():
+            by_class[cls] = by_class.get(cls, 0) + n
 
     print("\n=== Run report ===")
-    print(f"  ingested : {report.ingested}")
-    print(f"  persisted: {report.persisted}  (Items in Notion: {runner.gateway.count()})")
-    print(f"  by class : {report.by_class}")
-    print(f"  errors   : {report.errors}")
+    print(f"  sources  : {[a.name for a in adapters]}")
+    print(f"  ingested : {ingested}")
+    print(f"  persisted: {persisted}  (Items in Notion: {runner.gateway.count()})")
+    print(f"  by class : {by_class}")
+    print(f"  errors   : {errors}")
 
     print("\n=== Items in the System of Record ===")
     for payload in runner.gateway.all_items():
