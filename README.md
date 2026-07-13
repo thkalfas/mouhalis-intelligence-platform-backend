@@ -7,18 +7,18 @@ production pipeline that runs headless, collects from ~15 Greek/EU sources,
 deduplicates and classifies each Legal Event, and drafts a structured interpretation
 for the ones that matter. Notion is the single source of truth the legal team works in.
 
-> **Status: Phase 0 ✅ · Epics 1–6 ✅ (collection + dedup + tagging + triage).**
-> The full flow runs end-to-end offline on *fake* data; all three collection tiers
-> are built (seven Tier-1 adapters + text extraction, six politeness-governed Tier-2
-> scrapers, the Tier-3 commercial shared-inbox parser); deduplication does
-> config-driven weighted scoring, authority-ranked identity-preserving merge,
-> supersession, and a human confirmation queue; topic tagging maps Ontology
-> keywords + EuroVoc descriptors with a metered, Ontology-validated LLM fallback;
-> and relevance triage classifies each Item A/B/C (deterministic rules → LLM
-> classifier with the full structured contract) with class-aware retention and a
-> Class C TTL/overdue sweep. All unit-tested against fixtures — still zero
-> network/tokens. See `_bmad-output/` for the PRD, architecture spine, and the
-> epic/story breakdown that drive the build.
+> **Status: Phase 0 ✅ · Epics 1–7 ✅ — the full automated pipeline.** End-to-end
+> offline on *fake* data: all three collection tiers (seven Tier-1 adapters + text
+> extraction, six politeness-governed Tier-2 scrapers, the Tier-3 commercial
+> shared-inbox parser); config-driven weighted dedup with authority-ranked
+> identity-preserving merge, supersession, and a human confirmation queue; Ontology
+> topic tagging (keywords + EuroVoc) with a metered, Ontology-validated LLM
+> fallback; relevance triage into A/B/C (deterministic rules → structured LLM
+> classifier) with class-aware retention and a Class C TTL/overdue sweep; and a
+> schema-validated interpretation engine with retrieval augmentation, few-shot
+> examples, and model escalation. All unit-tested against fixtures — still zero
+> network/tokens. Remaining: **Epic 8** (human review workflows + weekly Quality
+> Observer). See `_bmad-output/` for the PRD, architecture spine, and epic/story plan.
 
 ## Architecture in one line
 
@@ -45,7 +45,7 @@ Runs offline — no Notion token or API key needed (local backend + fake LLM).
 # venv + pip (works everywhere; .venv/ is machine-local — recreate on new checkouts)
 python -m venv .venv
 .venv/Scripts/python -m pip install -e ".[dev]"   # Windows; on POSIX use .venv/bin/python
-.venv/Scripts/python -m pytest -q                 # run the test suite (112 tests)
+.venv/Scripts/python -m pytest -q                 # run the test suite (123 tests)
 .venv/Scripts/python -m legal_intel               # walking skeleton end-to-end
 
 # or, if uv is installed
@@ -77,7 +77,7 @@ by their backends and ship in the `full` extra: `pip install -e ".[full]"`.
 
 ## What's next
 
-Epic 7 (interpretation engine) onward — see
+Epic 8 (human review workflows + Quality Observer) — the final epic — see
 [`_bmad-output/planning-artifacts/epics.md`](_bmad-output/planning-artifacts/epics.md)
 and `HANDOFF.md` for the current state and the next step. Continue with the BMAD
 implementation flow (`bmad-sprint-planning` → `bmad-create-story` →

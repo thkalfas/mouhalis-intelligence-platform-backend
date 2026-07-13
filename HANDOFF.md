@@ -24,7 +24,7 @@ This repo is **Environment A** — the production pipeline. **Environment B** (8
 - **Scope: Environment A only** this track.
 - **Paradigm: pipes-and-filters over a Notion blackboard** — each stage is an idempotent filter reading Items in one `status` and writing them in the next; `status` is the only coordination pipe (AD-1). Notion's lack of coordination primitives is handled explicitly by AD-13..AD-16 (single-consumer statuses, key-serialized upserts, dedup-owned precedence, no silent late mutation).
 
-## Status: Phase 0 ✅ + Epics 1–6 ✅
+## Status: Phase 0 ✅ + Epics 1–7 ✅ (full automated pipeline)
 
 **Epic 0 (walking skeleton)** — the full flow runs offline on fake data:
 `src/legal_intel/` = core contracts (models, state machine, config-as-data, `NotionGateway` with upsert-by-key idempotency, `MeteredLLMClient`), the pipeline (normalize → dedup → tag → triage → interpret), and platform services (scheduler, cost ledger, logging, alerting, scraping politeness). Backends are pluggable — local store + fake LLM by default (offline), real Notion/Anthropic lazy-imported for later.
@@ -64,12 +64,17 @@ This repo is **Environment A** — the production pipeline. **Environment B** (8
 - Classifier now returns the **full structured contract** — `relevance`, `confidence`, Greek `reasoning`, `sector_touchpoints[]`, `action_signal`, `specialist_needed` — captured onto the Item (new fields `sector_touchpoints`/`action_signal`/`specialist_needed`; `action_signal` drives the WF2 24h fast-track later). Confidence threshold is config (`TriageConfig.high_confidence`, from `relevance_rules.yaml` `triage:`); high/low-confidence → A/B, everything else → C.
 - `pipeline/retention.py` (Story 6.3, AD-5/AD-2): Class B is index-only; Class C keeps full text under a **config TTL (7 days) → `sweep_overdue()` flags `overdue`**; `promote_class_c_to_a()` **refuses unless full text is present** (AD-2) and `downgrade_class_c_to_b()` purges full text. (Epic 8 wires the Notion review queue onto these.)
 
+**Epic 7 (Interpretation Engine) — implemented and tested** (FR-10/11/12, AD-7/9):
+- `pipeline/interpret.py` runs the 7 conceptual steps (legal-type → scope → delta → retrieval → client-impact → actions → confidence, each logged for traceability) as a deterministic retrieval/augmentation step feeding a structured generation; the output **validates against the `Interpretation` schema before persist** (AD-9) — a failure raises `PermanentError` and sets nothing (no partial record); the draft carries the not-legal-advice disclaimer.
+- Retrieval augmentation (Story 7.2): `retrieve_related()` pulls 3–5 prior Items with overlapping Topic **and** same authority within 3 years; gold-standard `InterpretationExample`s (optional `config/interpretation_examples.yaml`) are injected as few-shot by Topic; the Client Context Document (optional `config/client_context.md`) grounds the system prompt; cold start proceeds on it alone. The runner passes its `known` Items in for retrieval.
+- Model escalation (Story 7.3): `escalation_model` when topic ∈ config `topic_in` **or** the Item is `specialist_needed` (flagged by triage — the fix for the old pre-interpretation check); all model ids from `interpretation_config.yaml`, every call metered.
+
 ## Run it
 
 `uv` was not installed on the current machine; use the project venv directly (see setup below). With `uv` present, `uv run --extra dev python -m pytest -q` also works.
 
 ```bash
-.venv/Scripts/python -m pytest -q     # 112 tests, all green
+.venv/Scripts/python -m pytest -q     # 123 tests, all green
 .venv/Scripts/python -m legal_intel   # walking skeleton end-to-end (offline)
 ```
 
@@ -77,7 +82,7 @@ Expected skeleton run: 4 fake events ingested → **3 Items** (one duplicate mer
 
 ## Next step
 
-**Epic 7 — Interpretation Engine** (the blank-page killer for Class A). `pipeline/interpret.py` has the Phase-0 shape (single fake call → validated `Interpretation`, AD-9). Epic 7 builds it out: Story 7.1 the **7-step pipeline** (legal-type → scope → delta → retrieval → client-impact → actions → confidence) producing the schema-validated `Interpretation` (a validation failure fails the Item, never a partial record; the draft carries the not-legal-advice disclaimer), Story 7.2 **retrieval augmentation + few-shot** (3–5 related Items by Topic+authority within 3 years; cold-start falls back to the Client Context Document; gold-standard Interpretation Examples as few-shot), and Story 7.3 **model escalation** (config triggers: topic ∈ {csrd_scope, epant_decision, ste_decision} or `requires_specialist_review` → escalation_model; all model ids from `interpretation_config.yaml`, every call metered). See `epics.md` → Epic 7. Retrieval needs a "related items" query over the store — the `NotionGateway.all_items()` local backend suffices offline; note the Client Context Document is a PRD open question (cold-start input). (Then Epic 8 review workflows.)
+**Epic 8 — Human Review Workflows & Feedback** (the legal team's daily loop in Notion — the last epic). Stories: 8.1 WF1 Class C relevance review (the `promote_class_c_to_a`/`downgrade_class_c_to_b` retention actions from Epic 6 already exist — wire them to the "Pending Relevance Review" queue + SLA/`overdue`), 8.2 WF2 interpretation review with feedback capture (Approve / Edit+Approve capturing the field diff / Reject+Redo regenerating with notes / Escalate; SLA 3 business days, 24h when `action_signal == immediate`; topic-based routing), 8.3 WF3 client-impact & action planning (Client Action Status + Track-Deadline reminders), 8.4 bidirectional Notion edits + the B→A reclassify re-fetch (hydrate full text in place on the existing Item id, never mint a new Item — FR-22, AD-11), and 8.5 the weekly **Quality Observer** agent computing SM-1..SM-7 + counter-metrics against thresholds and writing a retro. See `epics.md` → Epic 8. Much of the machinery exists: state-machine human transitions, `dedup.confirm_merge/reject_as_distinct`, retention promote/downgrade, `tagging_coverage`, the cost ledger's monthly report. Epic 8 assembles them into the review flows + metrics.
 
 Notes on activation of already-built collection tiers:
 - **Tier-2**: the row/link/id selectors in `sources.yaml` are best-effort defaults — verify each against the live page (spec §5.2). JS-heavy sites (ΣτΕ, RASFF scrape mode) need a Playwright-backed fetcher injected into the `ScrapeClient`; the default fetcher is static-HTML httpx.

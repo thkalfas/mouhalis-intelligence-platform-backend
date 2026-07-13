@@ -45,6 +45,13 @@ def _load_yaml_optional(name: str) -> dict[str, Any]:
     return _load_yaml(name)
 
 
+def _load_text_optional(name: str) -> str:
+    """Read a plain-text config file (e.g. the Client Context Document); empty
+    string if absent."""
+    path = config_dir() / name
+    return path.read_text(encoding="utf-8") if path.exists() else ""
+
+
 # --------------------------------------------------------------------------- #
 # Typed config objects
 # --------------------------------------------------------------------------- #
@@ -107,6 +114,16 @@ class InterpretationConfig(BaseModel):
     max_tokens: int = 4000
 
 
+class InterpretationExample(BaseModel):
+    """A curated gold-standard interpretation used as a few-shot exemplar
+    (spec §8.4). Keyed by Topic; the tagger/interpreter pulls matching ones."""
+
+    topic: str
+    title: str = ""
+    summary: str = ""
+    notes: str = ""
+
+
 class DedupWeights(BaseModel):
     exact_source_id: float = 1.0
     text_hash: float = 0.95
@@ -135,6 +152,10 @@ class AppConfig(BaseModel):
     dedup: DedupConfig = Field(default_factory=DedupConfig)
     tagging: TaggingConfig = Field(default_factory=TaggingConfig)
     triage: TriageConfig = Field(default_factory=TriageConfig)
+    interpretation_examples: list[InterpretationExample] = Field(default_factory=list)
+    #: Client Context Document (spec §8.7) — cold-start background for the
+    #: interpreter's system prompt. Optional; empty until the client supplies it.
+    client_context: str = ""
     kad_codes: list[str] = Field(default_factory=list)
 
     def enabled_sources(self) -> list[SourceConfig]:
@@ -155,6 +176,8 @@ def load_config() -> AppConfig:
     interp_raw = _load_yaml("interpretation_config.yaml")
     dedup_raw = _load_yaml("dedup.yaml")
     tagging_raw = _load_yaml_optional("tagging.yaml")
+    examples_raw = _load_yaml_optional("interpretation_examples.yaml")
+    client_context = _load_text_optional("client_context.md")
 
     return AppConfig(
         sources=[SourceConfig(**s) for s in sources_raw.get("sources", [])],
@@ -164,6 +187,9 @@ def load_config() -> AppConfig:
         dedup=DedupConfig(**dedup_raw),
         tagging=TaggingConfig(**tagging_raw),
         triage=TriageConfig(**rules_raw.get("triage", {})),
+        interpretation_examples=[InterpretationExample(**e)
+                                 for e in examples_raw.get("examples", [])],
+        client_context=client_context,
         kad_codes=[str(k) for k in rules_raw.get("kad_codes", [])],
     )
 

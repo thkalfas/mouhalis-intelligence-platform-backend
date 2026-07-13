@@ -137,12 +137,12 @@ class PipelineRunner:
                          content_class=cls)
         return report
 
-    def _reinterpret(self, item: Item) -> Item:
+    def _reinterpret(self, item: Item, known: list[Item]) -> Item:
         """Re-run interpretation after a content-changing late merge (AD-16):
         route the Item back to Awaiting Interpretation for a fresh draft rather
         than mutating the existing (possibly Approved) reading in place."""
         self._transition(item, ItemStatus.CLASS_A_AWAITING_INTERPRETATION)
-        item = interpret_mod.interpret(item, self.cfg, self.llm)
+        item = interpret_mod.interpret(item, self.cfg, self.llm, known=known)
         self._transition(item, ItemStatus.CLASS_A_DRAFT_INTERPRETATION)
         return item
 
@@ -176,7 +176,7 @@ class PipelineRunner:
         # unless the merge changed content of an interpreted Item (AD-16).
         if item.content_class is not None:
             if outcome.reinterpret and item.content_class is ContentClass.A:
-                return self._reinterpret(item)
+                return self._reinterpret(item, known)
             return item
 
         # New item: triage decides the Content Class.
@@ -186,7 +186,7 @@ class PipelineRunner:
 
         if item.content_class is ContentClass.A:
             self._transition(item, ItemStatus.CLASS_A_AWAITING_INTERPRETATION)
-            item = interpret_mod.interpret(item, self.cfg, self.llm)  # AD-9
+            item = interpret_mod.interpret(item, self.cfg, self.llm, known=known)  # AD-9
             self._transition(item, ItemStatus.CLASS_A_DRAFT_INTERPRETATION)
         elif item.content_class is ContentClass.B:
             self._transition(item, ItemStatus.CLASS_B_INDEXED)
