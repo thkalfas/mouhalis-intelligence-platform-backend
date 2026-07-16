@@ -43,7 +43,11 @@ def to_payload(item: Item) -> dict:
 
 class NotionBackend(Protocol):
     def find_page_id(self, upsert_key: str) -> Optional[str]: ...
-    def write_page(self, page_id: str, upsert_key: str, payload: dict) -> None: ...
+    #: Create (page_id is None) or update the page, returning its authoritative
+    #: id — Notion returns the id of the created/updated page; the local backend
+    #: mints one. The gateway never fabricates ids itself.
+    def write_page(self, page_id: Optional[str], upsert_key: str,
+                   payload: dict) -> str: ...
     def get_page(self, page_id: str) -> Optional[dict]: ...
     def all_pages(self) -> list[dict]: ...
 
@@ -80,10 +84,13 @@ class LocalJSONBackend:
     def find_page_id(self, upsert_key: str) -> Optional[str]:
         return self._key_index.get(upsert_key)
 
-    def write_page(self, page_id: str, upsert_key: str, payload: dict) -> None:
+    def write_page(self, page_id: Optional[str], upsert_key: str,
+                   payload: dict) -> str:
+        page_id = page_id or f"page_{uuid.uuid4().hex}"
         self._pages[page_id] = payload
         self._key_index[upsert_key] = page_id
         self._flush()
+        return page_id
 
     def get_page(self, page_id: str) -> Optional[dict]:
         return self._pages.get(page_id)
@@ -115,11 +122,25 @@ class NotionApiBackend:
         results = resp.get("results", [])
         return results[0]["id"] if results else None
 
-    def write_page(self, page_id, upsert_key, payload):  # pragma: no cover
-        # Real property mapping is delivered in Epic 0 Story 0.5 provisioning.
-        raise NotImplementedError(
-            "NotionApiBackend.write_page: property mapping lands with Story 0.5."
+    def write_page(self, page_id, upsert_key, payload) -> str:  # pragma: no cover
+        """Create or update the Legal Events page from the Item payload, mapping
+        to the provisioned schema (notion_mapping). Full text goes to the page
+        body on create; updates touch properties only (body edits are additive
+        and out of scope for the automated path). Returns the page id."""
+        from .models import Item
+        from .notion_mapping import item_to_children, item_to_properties
+
+        item = Item.model_validate(payload)
+        properties = item_to_properties(item)
+        if page_id:
+            self._client.pages.update(page_id=page_id, properties=properties)
+            return page_id
+        created = self._client.pages.create(
+            parent={"database_id": self._database_id},
+            properties=properties,
+            children=item_to_children(item),
         )
+        return created["id"]
 
     def get_page(self, page_id):  # pragma: no cover
         return self._client.pages.retrieve(page_id)
@@ -158,10 +179,9 @@ class NotionGateway:
         key = item.upsert_key()
         with self._lock_for(item.dedup_key()):  # serialize per Legal Event
             page_id = item.page_id or self._backend.find_page_id(key)
-            if page_id is None:
-                page_id = f"page_{uuid.uuid4().hex}"
-            item.page_id = page_id
-            self._backend.write_page(page_id, key, to_payload(item))
+            # The backend returns the authoritative id (Notion's on create, or a
+            # minted one locally) — we never fabricate it here.
+            item.page_id = self._backend.write_page(page_id, key, to_payload(item))
         return item
 
     def upsert_batch(self, items: list[Item]) -> list[Item]:

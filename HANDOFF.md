@@ -80,7 +80,7 @@ This repo is **Environment A** — the production pipeline. **Environment B** (8
 `uv` was not installed on the current machine; use the project venv directly (see setup below). With `uv` present, `uv run --extra dev python -m pytest -q` also works.
 
 ```bash
-.venv/Scripts/python -m pytest -q     # 145 tests, all green
+.venv/Scripts/python -m pytest -q     # 154 tests, all green
 .venv/Scripts/python -m legal_intel   # walking skeleton end-to-end (offline)
 ```
 
@@ -90,7 +90,9 @@ Expected skeleton run: 4 fake events ingested → **3 Items** (one duplicate mer
 
 **All 9 epics (0–8) are implemented and tested offline — Environment A is feature-complete.** The full FR set (FR-1..FR-22) has landing code with a green 145-test suite, every stage exercised on fake data with pluggable real backends. What remains is **not new pipeline code** but productionization and the separate Environment B track:
 
-1. **Real-source activation** (per source, gated on the PRD §14 open questions): fill each source's `options` in `config/sources.yaml`, flip `enabled: true`, install the `full` extra, provide secrets in `.env`. Tier-2 selectors and the JS-fetcher (Playwright) need verification against live pages (spec §5.2); real Notion write mapping is stubbed in `NotionApiBackend.write_page` (Story 0.5 provisioning) — wire it before `LEGAL_INTEL_NOTION_BACKEND=notion`.
+1. **Real-source activation** (per source, gated on the PRD §14 open questions): fill each source's `options` in `config/sources.yaml`, flip `enabled: true`, install the `full` extra, provide secrets in `.env`. Tier-2 selectors and the JS-fetcher (Playwright) need verification against live pages (spec §5.2).
+
+**Notion provisioning — done (2026-07-16).** A standalone Notion workspace was built: page **"Mouhalis Legal Intelligence"** with the **Legal Events** DB (full Item schema, `Supersedes ↔ Superseded By` self-relation, 3 demo rows), **Cost Ledger** + **Interpretation Examples** DBs, and 6 views (WF1/WF2/WF3, Dedup Confirmation, All-by-Class board, Overdue). The **Item→Notion write-mapping is implemented** — `core/notion_mapping.py` (`item_to_properties`/`item_to_children`, unit-tested offline) and `NotionApiBackend.write_page` (create-or-update via notion-client). To go live against the real DB: set `NOTION_TOKEN`/`NOTION_DATABASE_ID`, share the page with the integration, and set `LEGAL_INTEL_NOTION_BACKEND=notion`. Notes: Status select options match `ItemStatus` values exactly; `Source`/`Topics` select options auto-create from canonical values (the seeded latinized `Source` options and draft `Topics` are cosmetic and will fill in on first real write / ontology workshop); people fields (Reviewer, Action Owner) are human-managed in Notion and never written by the pipeline.
 2. **Ontology workshop** — `config/ontology.yaml` is still a draft placeholder (blocks production tagging quality); all tagging/triage code is data-driven and needs no changes once it's finalized.
 3. **Client Context Document** — drop `config/client_context.md` to lift interpretation cold-start quality (§8.7).
 4. **Scheduler wiring for real cadences** — `platform/scheduler.py` + `adapters/registry.build_enabled_adapters` are ready; connect APScheduler (`full` extra) and the Quality Observer's weekly job.
