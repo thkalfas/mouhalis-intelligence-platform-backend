@@ -1,14 +1,23 @@
-"""Run the Phase-0 walking skeleton end-to-end from the CLI.
+"""Run the collection pipeline end-to-end from the CLI.
 
     python -m legal_intel
 
-Uses the local (offline) Notion backend and the fake LLM by default, so it runs
-with no token or network — the Phase-0 validation gate.
+Runs one full pass over every source enabled in ``config/sources.yaml``. With no
+configuration it uses the local (offline) Notion backend and the fake LLM, so it
+runs with no token or network — the validation gate. Point it at the real
+backends by setting the environment variables in ``.env`` (see ``.env.example``):
+``LEGAL_INTEL_NOTION_BACKEND=notion`` + ``NOTION_TOKEN``/``NOTION_DATABASE_ID``
+and ``LEGAL_INTEL_LLM_BACKEND=anthropic`` + ``ANTHROPIC_API_KEY``.
+
+Schedule this command (Windows Task Scheduler / cron / systemd timer) to run it
+on the source cadences; one invocation is idempotent (upsert-by-key, AD-14).
 """
 from __future__ import annotations
 
 import json
+import os
 import sys
+from pathlib import Path
 
 # Greek titles must print on any console; Windows defaults to cp1252 and would
 # otherwise crash on the first Greek character. Force UTF-8 on stdout/stderr.
@@ -16,6 +25,24 @@ for _stream in (sys.stdout, sys.stderr):
     reconfigure = getattr(_stream, "reconfigure", None)
     if reconfigure is not None:
         reconfigure(encoding="utf-8")
+
+
+def _load_dotenv() -> None:
+    """Load KEY=VALUE lines from a ``.env`` in the current dir (secrets stay out
+    of the repo). Minimal + dependency-free; a real host may inject env vars
+    directly instead. Existing environment variables win."""
+    path = Path.cwd() / ".env"
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+_load_dotenv()
 
 from .adapters.registry import build_enabled_adapters
 from .core.models import Item

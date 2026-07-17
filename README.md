@@ -78,20 +78,27 @@ Business rules live in `config/*.yaml` and are read at runtime — never hard-co
 Real integrations (`notion-client`, `anthropic`, `playwright`, …) are lazy-imported
 by their backends and ship in the `full` extra: `pip install -e ".[full]"`.
 
+## Repo & running it
+
+- **Repo:** https://github.com/REBORRNVibes/mouhalis-legal-intel (private, `main`)
+- **Run / activate:** [`ACTIVATION.md`](ACTIVATION.md) — clone & run offline in
+  three commands, then go-live steps (secrets in `.env`, enable sources, schedule
+  `python -m legal_intel`).
+
 ## What's next
 
-All 9 epics (0–8) are implemented and tested — **Environment A is feature-complete**.
-What remains is productionization, not new pipeline code. See `HANDOFF.md` →
-"Next step" for the full activation checklist. In short:
+All 9 epics (0–8) are implemented and tested, **and the Notion workspace +
+Item→Notion write-mapping are done** — Environment A is feature-complete. What
+remains is productionization, not pipeline code (see `HANDOFF.md` / `ACTIVATION.md`):
 
-- **Activate real sources** (per source, gated on the PRD §14 open questions): fill
-  its `options:` in `config/sources.yaml`, set `enabled: true`, install the `full`
-  extra (`pip install -e ".[full]"`), and provide secrets in `.env`. Adapters are
-  already wired via `adapters/registry.py` (Tier-1 → `HttpClient`, Tier-2 →
-  `ScrapeClient`, Tier-3 inbox → IMAP). Tier-2 selectors + the Playwright fetcher
-  need live verification; real Notion write mapping (`NotionApiBackend.write_page`)
-  is the remaining stub before `LEGAL_INTEL_NOTION_BACKEND=notion`.
+- **Activate real sources** — fill each source's `options:` in
+  `config/sources.yaml`, set `enabled: true`, install the `full` extra, provide
+  secrets in `.env`. Adapters are wired via `adapters/registry.py` (Tier-1 →
+  `HttpClient`, Tier-2 → `ScrapeClient`, Tier-3 inbox → IMAP). Tier-2 selectors +
+  the Playwright fetcher need live verification; then set
+  `LEGAL_INTEL_NOTION_BACKEND=notion`.
 - **Ontology workshop** finalizes `config/ontology.yaml` (still a draft); the
   **Client Context Document** (`config/client_context.md`) lifts interpretation cold
   start. Both are data — no code changes.
-- **Environment B (Cowork agents)** is a separate downstream track (`cowork-agents.md`).
+- **Hosting + scheduler** and the **alert channel**; then **Environment B (Cowork
+  agents)** as a separate downstream track (`cowork-agents.md`).
