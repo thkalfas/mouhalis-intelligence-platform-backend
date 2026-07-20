@@ -112,10 +112,25 @@ class NotionApiBackend:
             ) from exc
         self._client = Client(auth=token or os.environ["NOTION_TOKEN"])
         self._database_id = database_id or os.environ["NOTION_DATABASE_ID"]
+        # Notion API 2025-09-03+ (notion-client 3.x) queries/creates against a
+        # *data source*, not the database directly. Resolve (and cache) the DB's
+        # data source id; overridable via env for multi-source DBs.
+        self._data_source_id = os.environ.get("NOTION_DATA_SOURCE_ID")
+
+    def _ds_id(self) -> str:  # pragma: no cover - needs network
+        if not self._data_source_id:
+            db = self._client.databases.retrieve(database_id=self._database_id)
+            sources = db.get("data_sources") or []
+            if not sources:
+                raise RuntimeError(
+                    f"Database {self._database_id} has no data source to write to"
+                )
+            self._data_source_id = sources[0]["id"]
+        return self._data_source_id
 
     def find_page_id(self, upsert_key: str) -> Optional[str]:  # pragma: no cover
-        resp = self._client.databases.query(
-            database_id=self._database_id,
+        resp = self._client.data_sources.query(
+            data_source_id=self._ds_id(),
             filter={"property": "Upsert Key", "rich_text": {"equals": upsert_key}},
             page_size=1,
         )
@@ -136,7 +151,7 @@ class NotionApiBackend:
             self._client.pages.update(page_id=page_id, properties=properties)
             return page_id
         created = self._client.pages.create(
-            parent={"database_id": self._database_id},
+            parent={"type": "data_source_id", "data_source_id": self._ds_id()},
             properties=properties,
             children=item_to_children(item),
         )
