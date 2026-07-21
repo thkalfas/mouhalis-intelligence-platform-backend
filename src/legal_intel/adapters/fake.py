@@ -10,12 +10,16 @@ deduplication and merge.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import date, datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from ..core.models import SourceRecord
 from .base import SourceAdapter
 
-_NOW = datetime(2026, 7, 10, 9, 0, tzinfo=timezone.utc)
+# Demo data stays recent (relative to today) so it always looks current and is
+# never dropped by the lookback window (config max_age_days).
+_NOW = datetime.now(timezone.utc)
+_RECENT = (_NOW - timedelta(days=2)).date()
+_RECENT2 = (_NOW - timedelta(days=1)).date()
 
 
 class FakeSourceAdapter(SourceAdapter):
@@ -29,7 +33,7 @@ class FakeSourceAdapter(SourceAdapter):
             title="Κανονισμός για την ιχνηλασιμότητα καπνικών προϊόντων (ΚΑΔ 46.35)",
             type="Regulation",
             authority="EU Commission",
-            date_published=date(2026, 7, 8),
+            date_published=_RECENT,
             url="https://eur-lex.europa.eu/legal-content/EL/TXT/?uri=CELEX:32026R0001",
             full_text=(
                 "Ο παρών κανονισμός θεσπίζει νέες υποχρεώσεις ιχνηλασιμότητας για "
@@ -47,7 +51,7 @@ class FakeSourceAdapter(SourceAdapter):
             title="Νέος κανονισμός ιχνηλασιμότητας καπνικών — ΚΑΔ 46.35",
             type="Regulation",
             authority="kodiko.gr",
-            date_published=date(2026, 7, 8),
+            date_published=_RECENT,
             url="https://www.kodiko.gr/nomothesia/document/2026R0001",
             full_text=(
                 "Ο παρών κανονισμός θεσπίζει νέες υποχρεώσεις ιχνηλασιμότητας για "
@@ -65,7 +69,7 @@ class FakeSourceAdapter(SourceAdapter):
             title="Απόφαση για ναυτιλιακά θέματα λιμένων",
             type="Απόφαση",
             authority="Υπουργείο Ναυτιλίας",
-            date_published=date(2026, 7, 9),
+            date_published=_RECENT2,
             url="https://diavgeia.gov.gr/decision/ADA-MARITIME-77",
             full_text="Ρυθμίσεις για ναυτιλιακές δραστηριότητες και λιμενικές υποδομές. " * 4,
             language="el",
@@ -79,7 +83,7 @@ class FakeSourceAdapter(SourceAdapter):
             title="Εγκύκλιος για επισήμανση ορισμένων προϊόντων",
             type="Εγκύκλιος",
             authority="ΑΑΔΕ",
-            date_published=date(2026, 7, 9),
+            date_published=_RECENT2,
             url="https://diavgeia.gov.gr/decision/ADA-FOOD-AMBIG-12",
             full_text="Διευκρινίσεις σχετικά με την επισήμανση προϊόντων σε ορισμένες περιπτώσεις. " * 4,
             language="el",

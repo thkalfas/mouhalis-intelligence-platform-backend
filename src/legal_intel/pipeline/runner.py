@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from ..adapters.base import SourceAdapter
@@ -81,6 +82,7 @@ class RunReport:
     ingested: int = 0
     persisted: int = 0
     skipped: int = 0
+    filtered: int = 0  # skipped by the lookback window (too old)
     errors: int = 0
     by_class: dict[str, int] = field(default_factory=dict)
 
@@ -121,12 +123,27 @@ class PipelineRunner:
         sm.assert_transition(item.status, dst, sm.Actor.PIPELINE)
         item.status = dst
 
-    def run(self, adapter: SourceAdapter) -> RunReport:
+    def _too_old(self, record, today: date) -> bool:
+        """Lookback window (config max_age_days): skip Items published before the
+        cutoff. 0 disables it; undated records always pass."""
+        max_age = self.cfg.max_age_days
+        if not max_age or record.date_published is None:
+            return False
+        return record.date_published < today - timedelta(days=max_age)
+
+    def run(self, adapter: SourceAdapter, now: Optional[date] = None) -> RunReport:
         report = RunReport()
         known = self._known_items()
+        today = now or datetime.now(timezone.utc).date()
 
         for record in adapter.fetch():
             report.ingested += 1
+            if self._too_old(record, today):
+                report.filtered += 1
+                self.log.log(source=adapter.name, event="filtered",
+                             status="too_old", item_id=record.source_id,
+                             error=f"older than {self.cfg.max_age_days}d")
+                continue
             try:
                 item = self._process(record, known)
             except PermanentError as exc:

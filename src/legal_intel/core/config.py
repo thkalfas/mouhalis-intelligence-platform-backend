@@ -156,6 +156,10 @@ class AppConfig(BaseModel):
     #: Client Context Document (spec §8.7) — cold-start background for the
     #: interpreter's system prompt. Optional; empty until the client supplies it.
     client_context: str = ""
+    #: Lookback window: Items whose publication date is older than this many days
+    #: are skipped before triage/interpretation (bounds a first-run backfill and
+    #: saves LLM cost). 0 disables the filter; undated Items always pass.
+    max_age_days: int = 180
     kad_codes: list[str] = Field(default_factory=list)
 
     def enabled_sources(self) -> list[SourceConfig]:
@@ -190,6 +194,7 @@ def load_config() -> AppConfig:
         interpretation_examples=[InterpretationExample(**e)
                                  for e in examples_raw.get("examples", [])],
         client_context=client_context,
+        max_age_days=int(sources_raw.get("max_age_days", 180)),
         kad_codes=[str(k) for k in rules_raw.get("kad_codes", [])],
     )
 

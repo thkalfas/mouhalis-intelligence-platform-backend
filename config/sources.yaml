@@ -3,6 +3,12 @@
 # `adapter` key (resolved via adapters/registry.py) and adapter-specific
 # `options` kept as data. Only FakeSource is enabled by default; real Tier-1
 # adapters flip `enabled: true` once their credentials/cadence are signed off.
+
+# Lookback window (days): Items published longer ago than this are skipped before
+# triage/interpretation — bounds the first-run backfill and saves LLM cost.
+# 0 disables it; undated Items always pass. Tune for the initial crawl.
+max_age_days: 180
+
 sources:
   - name: FakeSource
     tier: 1
