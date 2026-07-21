@@ -9,6 +9,7 @@ re-runs so the whole run is idempotent (AD-4) and cost is not re-incurred.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -16,7 +17,7 @@ from ..adapters.base import SourceAdapter
 from ..core import state_machine as sm
 from ..core.config import AppConfig, load_config
 from ..core.errors import PermanentError
-from ..core.llm_client import FakeLLMBackend, MeteredLLMClient
+from ..core.llm_client import FakeLLMBackend, MeteredLLMClient, make_backend
 from ..core.models import ContentClass, Item, ItemStatus
 from ..core.notion_gateway import NotionGateway
 from ..platform.alerting import AlertLevel, get_alerter
@@ -92,10 +93,18 @@ class PipelineRunner:
         self.cfg = cfg or load_config()
         self.gateway = gateway or NotionGateway()
         self.ledger = ledger or CostLedger()
-        self.llm = llm or MeteredLLMClient(
-            backend=FakeLLMBackend(responder=phase0_responder), sink=self.ledger
-        )
+        self.llm = llm or MeteredLLMClient(backend=self._default_backend(),
+                                           sink=self.ledger)
         self.log = get_logger()
+
+    @staticmethod
+    def _default_backend():
+        """Honor LEGAL_INTEL_LLM_BACKEND: real Claude when 'anthropic', otherwise
+        the deterministic offline fake (canned but schema-valid output, so the
+        skeleton and tests run with no key). An explicitly injected llm wins."""
+        if os.environ.get("LEGAL_INTEL_LLM_BACKEND", "fake").lower() == "anthropic":
+            return make_backend()  # AnthropicBackend (reads ANTHROPIC_API_KEY)
+        return FakeLLMBackend(responder=phase0_responder)
 
     def _known_items(self) -> list[Item]:
         """Reconstruct known Items from the gateway so dedup/idempotency survive

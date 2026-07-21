@@ -53,6 +53,11 @@ class _NullSink:
 # kept here only so the Phase-0 ledger produces non-zero, plausible numbers.
 _PRICING: dict[str, tuple[float, float]] = {
     "fake-model": (0.0, 0.0),
+    # Real model ids (config-driven; indicative USD per 1M tokens, in/out).
+    "claude-sonnet-5": (3.0, 15.0),
+    "claude-opus-4-8": (15.0, 75.0),
+    "claude-haiku-4-5-20251001": (0.80, 4.0),
+    # Aliases kept for back-compat / fixtures.
     "claude-sonnet": (3.0, 15.0),
     "claude-opus": (15.0, 75.0),
     "claude-haiku": (0.80, 4.0),
@@ -62,6 +67,26 @@ _PRICING: dict[str, tuple[float, float]] = {
 def _price(model: str, in_tok: int, out_tok: int) -> float:
     in_rate, out_rate = _PRICING.get(model, (3.0, 15.0))
     return round(in_rate * in_tok / 1_000_000 + out_rate * out_tok / 1_000_000, 6)
+
+
+def extract_json(text: str) -> dict:
+    """Parse a JSON object from an LLM response. Real models often wrap JSON in
+    ```json fences or surrounding prose; strip those and, as a last resort, take
+    the outermost {...} span. Raises json.JSONDecodeError if nothing parses."""
+    s = (text or "").strip()
+    if s.startswith("```"):
+        # drop the opening fence line (``` or ```json) and any trailing fence
+        s = s.split("\n", 1)[1] if "\n" in s else s[3:]
+        if s.rstrip().endswith("```"):
+            s = s.rstrip()[:-3]
+        s = s.strip()
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError:
+        start, end = s.find("{"), s.rfind("}")
+        if 0 <= start < end:
+            return json.loads(s[start:end + 1])
+        raise
 
 
 # --------------------------------------------------------------------------- #

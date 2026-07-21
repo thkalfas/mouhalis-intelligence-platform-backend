@@ -16,7 +16,7 @@ import json
 from typing import Optional
 
 from ..core.config import AppConfig
-from ..core.llm_client import MeteredLLMClient
+from ..core.llm_client import MeteredLLMClient, extract_json
 from ..core.models import Item
 
 _TAGGER_SYSTEM = (
@@ -68,7 +68,7 @@ def _llm_tag(item: Item, cfg: AppConfig, llm: MeteredLLMClient) -> list[str]:
         system=_TAGGER_SYSTEM, prompt=prompt, item_id=item.page_id,
     )
     try:
-        proposed = json.loads(result.text).get("topics", [])
+        proposed = extract_json(result.text).get("topics", [])
     except (ValueError, AttributeError):
         proposed = []
     # Validate against the Ontology before persist (AD-7) — drop anything unknown.

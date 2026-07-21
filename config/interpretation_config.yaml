@@ -2,8 +2,8 @@
 # resolved against current availability at deploy time — NEVER hard-coded in code.
 # The placeholder aliases below map to real Claude model IDs in the deployment env.
 interpretation:
-  default_model: claude-sonnet          # efficient, large-volume (spec §8.5)
-  escalation_model: claude-opus         # high-stakes reasoning
+  default_model: claude-sonnet-5        # efficient, large-volume (spec §8.5)
+  escalation_model: claude-opus-4-8     # high-stakes reasoning
   escalation_triggers:
     topic_in: ["csrd_scope", "epant_decision", "ste_decision"]
     self_flag: requires_specialist_review

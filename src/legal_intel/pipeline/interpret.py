@@ -25,7 +25,7 @@ from pydantic import ValidationError
 
 from ..core.config import AppConfig
 from ..core.errors import PermanentError
-from ..core.llm_client import MeteredLLMClient
+from ..core.llm_client import MeteredLLMClient, extract_json
 from ..core.models import Interpretation, Item
 from ..platform.logging import get_logger
 
@@ -34,8 +34,15 @@ _INTERPRET_SYSTEM = (
     "for a Greek wholesale tobacco/food + franchised retail food-service business "
     "(KAD 46.35, 46.37, 46.38, 56.10, 56.30). Work through: legal type, scope, "
     "what changed (before/after/delta), client impact, concrete actions with "
-    "owners/deadlines, and a confidence self-assessment. Output JSON matching the "
-    "Interpretation schema."
+    "owners/deadlines, and a confidence self-assessment. Output ONLY the JSON "
+    "object matching the Interpretation schema — no markdown fences, no prose. "
+    "Keys: summary, what_changed_before, what_changed_after, what_changed_delta, "
+    "business_lines_affected[], support_functions_affected[], operational_impact, "
+    "compliance_new_obligations[], compliance_lifted_obligations[], "
+    "actions_required[{action, owner_role, deadline, priority, estimated_effort}], "
+    "entry_into_force, transition_end, cited_articles[], confidence_notes, "
+    "requires_specialist_review, specialist_domain. All prose in Greek, but "
+    "'priority' and 'estimated_effort' MUST be exactly one of: low, medium, high."
 )
 
 # The 7 conceptual steps, logged for traceability (spec §8.3).
@@ -137,7 +144,7 @@ def interpret(item: Item, cfg: AppConfig, llm: MeteredLLMClient,
                           system=_INTERPRET_SYSTEM, prompt=prompt,
                           item_id=item.page_id)
     try:
-        payload = json.loads(result.text)
+        payload = extract_json(result.text)
         interp = Interpretation(**payload)  # AD-9: validate before persist
     except (json.JSONDecodeError, ValidationError, TypeError) as exc:
         raise PermanentError(

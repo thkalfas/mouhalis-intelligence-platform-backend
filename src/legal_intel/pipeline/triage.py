@@ -10,7 +10,7 @@ import json
 from typing import Optional
 
 from ..core.config import AppConfig
-from ..core.llm_client import MeteredLLMClient
+from ..core.llm_client import MeteredLLMClient, extract_json
 from ..core.models import ClassReasoning, ContentClass, DecidedBy, Item
 
 _CLASSIFIER_SYSTEM = (
@@ -19,7 +19,8 @@ _CLASSIFIER_SYSTEM = (
     "56.30) in Greece + EU. Return JSON with keys: relevance (high|medium|low), "
     "confidence (0..1), reasoning (Greek, 2-3 sentences), sector_touchpoints "
     "(array), action_signal (immediate|monitor|none), specialist_needed (bool). "
-    "Prefer 'medium' over guessing when uncertain."
+    "Prefer 'medium' over guessing when uncertain. Output ONLY the JSON object — "
+    "no markdown fences, no prose."
 )
 
 
@@ -81,7 +82,14 @@ def triage(item: Item, cfg: AppConfig, llm: MeteredLLMClient) -> Item:
                           model=cfg.interpretation.default_model,
                           system=_CLASSIFIER_SYSTEM, prompt=prompt,
                           item_id=item.page_id)
-    verdict = json.loads(result.text)
+    # A malformed classifier response must not crash the run (AD-12): treat it as
+    # "undecided" → Class C for a human to relevance-check.
+    try:
+        verdict = extract_json(result.text)
+    except (json.JSONDecodeError, ValueError):
+        verdict = {"relevance": "medium", "confidence": 0.0,
+                   "reasoning": "Ο ταξινομητής επέστρεψε μη έγκυρη απάντηση — "
+                                "παραπομπή σε ανθρώπινο έλεγχο."}
     relevance = verdict.get("relevance", "medium")
     confidence = float(verdict.get("confidence", 0.5))
     item.confidence_score = confidence

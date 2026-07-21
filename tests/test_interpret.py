@@ -138,6 +138,19 @@ def test_escalation_on_specialist_flag(cfg):
     assert led.rows[-1].model == cfg.interpretation.escalation_model
 
 
+def test_action_item_coerces_localized_levels(cfg):
+    # Real Claude sometimes returns Greek / parenthetical effort+priority values;
+    # the schema must coerce rather than fail the whole interpretation.
+    from legal_intel.core.models import ActionItem
+    a = ActionItem(action="x", owner_role="IT", deadline="2026-09-01",
+                   priority="υψηλή", estimated_effort="χαμηλή (1-2 ώρες)")
+    assert a.priority == "high"
+    assert a.estimated_effort == "low"
+    b = ActionItem(action="y", owner_role="Legal", deadline="ongoing",
+                   priority="μεσαία", estimated_effort="μεσαία (0.5-1 ημέρα)")
+    assert b.priority == "medium" and b.estimated_effort == "medium"
+
+
 def test_interpretation_call_is_metered(cfg):
     led = CostLedger()
     llm = MeteredLLMClient(backend=FakeLLMBackend(responder=lambda s, p: json.dumps(_VALID_INTERP)),

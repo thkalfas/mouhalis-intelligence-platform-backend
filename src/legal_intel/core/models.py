@@ -16,7 +16,7 @@ from datetime import date, datetime, timezone
 from enum import Enum
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # --------------------------------------------------------------------------- #
@@ -69,12 +69,48 @@ class SourceLink(BaseModel):
     collected_at: datetime
 
 
+#: Map the LLM's occasional localized/variant level words to the canonical enum.
+#: Real models sometimes answer in Greek or add parentheticals ("χαμηλή (1-2 ώρες)")
+#: even when the schema is English — coerce rather than fail the whole Item.
+_LEVEL_WORDS = {
+    "low": "low", "medium": "medium", "high": "high", "med": "medium",
+    "χαμηλη": "low", "χαμηλο": "low", "μικρη": "low", "μικρο": "low",
+    "μεσαια": "medium", "μετρια": "medium", "μεσαιο": "medium", "μετριο": "medium",
+    "υψηλη": "high", "υψηλο": "high", "μεγαλη": "high", "μεγαλο": "high",
+}
+
+
+def _strip_accents(s: str) -> str:
+    import unicodedata
+
+    return "".join(c for c in unicodedata.normalize("NFD", s)
+                   if unicodedata.category(c) != "Mn")
+
+
+def _coerce_level(value: str, default: str) -> str:
+    if not isinstance(value, str):
+        return default
+    token = _strip_accents(value.strip().lower()).split("(")[0].strip()
+    token = token.split()[0] if token else token
+    return _LEVEL_WORDS.get(token, default)
+
+
 class ActionItem(BaseModel):
     action: str
     owner_role: str
     deadline: str  # ISO date | "ongoing" | "upon_next_review"
-    priority: Literal["high", "medium", "low"]
+    priority: Literal["high", "medium", "low"] = "medium"
     estimated_effort: Literal["low", "medium", "high"] = "medium"
+
+    @field_validator("priority", mode="before")
+    @classmethod
+    def _norm_priority(cls, v):
+        return _coerce_level(v, "medium") if v is not None else "medium"
+
+    @field_validator("estimated_effort", mode="before")
+    @classmethod
+    def _norm_effort(cls, v):
+        return _coerce_level(v, "medium") if v is not None else "medium"
 
 
 class Interpretation(BaseModel):
