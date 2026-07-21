@@ -26,7 +26,12 @@ from .base import SourceAdapter
 from ._util import now_utc, parse_iso_date
 
 _RESOURCE_TYPE_BASE = "http://publications.europa.eu/resource/authority/resource-type/"
+# Full-text: CELLAR content negotiation on the CELEX resource. Must request
+# `application/xhtml+xml` — plain text/html 404s and the eur-lex.europa.eu page
+# is a JS shell with no server-rendered text (both found on first live contact).
+# Content language via `content_language` (default el).
 _CELEX_REST = "http://publications.europa.eu/resource/celex/"
+_CELEX_ACCEPT = "application/xhtml+xml"
 _SPARQL_JSON = "application/sparql-results+json"
 
 # A corrigendum/consolidated suffix, e.g. 32024R1679R(01) -> base 32024R1679.
@@ -66,11 +71,15 @@ class EurLexAdapter(SourceAdapter):
 
         eurovoc_clause = ""
         if eurovoc:
-            values = " ".join(f'"{d}"' for d in eurovoc)
+            # EuroVoc prefLabels are language-tagged literals ("tobacco
+            # industry"@en); compare on LCASE(STR(...)) so plain descriptors match
+            # regardless of tag/case (a plain VALUES match returns nothing — the
+            # bug found on first live contact with CELLAR).
+            values = ", ".join(f'"{d.lower()}"' for d in eurovoc)
             eurovoc_clause = (
                 "  ?work cdm:work_is_about_concept_eurovoc ?ev .\n"
                 "  ?ev skos:prefLabel ?evLabel .\n"
-                f"  VALUES ?evLabel {{ {values} }}\n"
+                f"  FILTER(LCASE(STR(?evLabel)) IN ({values}))\n"
             )
 
         return f"""PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
@@ -81,6 +90,7 @@ SELECT DISTINCT ?work ?celex ?title ?date ?type WHERE {{
   ?work cdm:work_date_document ?date .
   ?work cdm:work_has_resource-type ?resType .
   ?resType skos:prefLabel ?type .
+  FILTER(LANG(?type) = "en")
   ?exp cdm:expression_belongs_to_work ?work .
   ?exp cdm:expression_title ?title .
   ?exp cdm:expression_uses_language <http://publications.europa.eu/resource/authority/language/{language}> .
@@ -121,13 +131,14 @@ LIMIT {limit}"""
         raw_body: Optional[bytes] = None
         content_type: Optional[str] = None
         try:
+            lang = self.cfg.options.get("content_language", "el").lower()
             body = self.http.get(
                 f"{_CELEX_REST}{celex}",
-                accept="text/html",
-                headers={"Accept-Language": "el"},
+                accept=_CELEX_ACCEPT,
+                headers={"Accept-Language": lang},
             )
             raw_body = body.content
-            content_type = body.content_type or "text/html"
+            content_type = body.content_type or "application/xhtml+xml"
         except Exception as exc:  # full text is best-effort; identity still emits
             self.log.log(source=self.name, event="fetch_fulltext",
                          status="degraded", error=str(exc), item_id=celex)

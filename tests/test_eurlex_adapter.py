@@ -42,7 +42,7 @@ class _RoutingTransport:
         if "sparql" in url:
             return HttpResponse(200, url, json.dumps(_SPARQL_RESULT).encode(),
                                 {"content-type": "application/sparql-results+json"})
-        # celex REST full-text fetch
+        # CELLAR full-text fetch: …/resource/celex/<celex>
         celex = url.rsplit("/", 1)[-1]
         if celex in self.fail:
             return HttpResponse(404, url, b"", {})
