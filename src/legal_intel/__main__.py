@@ -44,29 +44,53 @@ def _load_dotenv() -> None:
 
 _load_dotenv()
 
-from .adapters.registry import build_enabled_adapters
+from datetime import datetime, timezone
+
+from .adapters.registry import build_adapter
 from .core.models import Item
 from .pipeline.runner import PipelineRunner
+from .platform.source_health import (SourceHealth, SourceHealthWriter,
+                                     status_from_report)
 
 
 def main() -> None:
     runner = PipelineRunner()
+    health = SourceHealthWriter()  # no-op unless the Notion board is configured
     # Config-driven wiring (AD-3, AD-8): run whichever sources are enabled in
-    # sources.yaml. Offline, that is just FakeSource; enabling a real Tier-1
-    # adapter is a config flip (plus its network prerequisites).
-    adapters = build_enabled_adapters(runner.cfg)
+    # sources.yaml. Offline, that is just FakeSource; enabling a real adapter is
+    # a config flip (plus its network prerequisites). Each source's outcome is
+    # recorded to the Source Health board (FR-20).
+    sources = runner.cfg.enabled_sources()
     ingested = persisted = errors = 0
     by_class: dict[str, int] = {}
-    for adapter in adapters:
-        report = runner.run(adapter)
-        ingested += report.ingested
-        persisted += report.persisted
-        errors += report.errors
-        for cls, n in report.by_class.items():
-            by_class[cls] = by_class.get(cls, 0) + n
+    for src in sources:
+        now = datetime.now(timezone.utc)
+        try:
+            report = runner.run(build_adapter(src))
+            status = status_from_report(report.persisted, report.errors)
+            note = f"{report.persisted}/{report.ingested} collected, {report.errors} errored"
+        except Exception as exc:  # a whole-source failure isolates here (AD-12)
+            report = None
+            status, note = "Failure", str(exc)[:400]
+            errors += 1
+            runner.log.log(source=src.name, event="source_run", status="failed",
+                           error=str(exc))
+        health.record(SourceHealth(
+            source=src.name, tier=src.tier, adapter=src.adapter or "", enabled=src.enabled,
+            status=status, cadence=src.cadence, authority_rank=src.authority_rank,
+            items_collected=(report.persisted if report else 0),
+            filtered=(report.filtered if report else 0),
+            errors=(report.errors if report else 1), notes=note, last_run=now))
+        if report is not None:
+            ingested += report.ingested
+            persisted += report.persisted
+            errors += report.errors
+            for cls, n in report.by_class.items():
+                by_class[cls] = by_class.get(cls, 0) + n
 
     print("\n=== Run report ===")
-    print(f"  sources  : {[a.name for a in adapters]}")
+    print(f"  sources  : {[s.name for s in sources]}"
+          + ("  [health board active]" if health.active else ""))
     print(f"  ingested : {ingested}")
     print(f"  persisted: {persisted}  (Items in Notion: {runner.gateway.count()})")
     print(f"  by class : {by_class}")
