@@ -10,12 +10,14 @@
 max_age_days: 180
 
 sources:
+  # Offline demo fixture — DISABLED so no synthetic items reach the real DB.
+  # Tests instantiate FakeSourceAdapter directly; they don't rely on this flag.
   - name: FakeSource
     tier: 1
     endpoint: "memory://fixtures"
     cadence: "30m"
     authority_rank: 1
-    enabled: true
+    enabled: false
     adapter: fake
 
   # --- Tier 1 (official) — authority_rank 1 ---

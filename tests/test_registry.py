@@ -37,11 +37,12 @@ def test_missing_adapter_key_raises():
         build_adapter(cfg)
 
 
-def test_enabled_adapters_from_real_config_is_only_fake():
+def test_no_sources_enabled_by_default():
     app_cfg = load_config()
     adapters = build_enabled_adapters(app_cfg)
-    # Only FakeSource ships enabled; real Tier-1 sources are gated off until sign-off.
-    assert [a.name for a in adapters] == ["FakeSource"]
+    # Production-safe default: nothing runs (incl. the demo FakeSource) until a
+    # real source is explicitly enabled + credentialed. No fake items reach Notion.
+    assert adapters == []
 
 
 def test_real_config_carries_adapter_options():

@@ -85,6 +85,7 @@ class RunReport:
     filtered: int = 0  # skipped by the lookback window (too old)
     errors: int = 0
     by_class: dict[str, int] = field(default_factory=dict)
+    error_details: list[tuple[str, str]] = field(default_factory=list)  # (source_id, reason)
 
 
 class PipelineRunner:
@@ -148,6 +149,7 @@ class PipelineRunner:
                 item = self._process(record, known)
             except PermanentError as exc:
                 report.errors += 1
+                report.error_details.append((getattr(record, "source_id", "?"), str(exc)))
                 self.log.log(source=adapter.name, event="process",
                              status="skipped", error=str(exc))
                 get_alerter().fire(AlertLevel.WARNING,
