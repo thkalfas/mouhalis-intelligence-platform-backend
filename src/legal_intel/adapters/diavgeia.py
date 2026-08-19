@@ -15,7 +15,7 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from ..core.config import SourceConfig
@@ -26,6 +26,23 @@ from .base import SourceAdapter
 from ._util import now_utc, parse_iso_date
 
 _SHA256_HEX = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
+_DMY = re.compile(r"^(\d{2})/(\d{2})/(\d{4})")
+
+
+def _parse_diavgeia_date(value) -> Optional[date]:
+    """Δι@ύγεια dates vary by endpoint: luminapi returns 'DD/MM/YYYY HH:MM:SS',
+    others epoch-millis or ISO. Handle all three."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value / 1000, tz=timezone.utc).date()
+    s = str(value).strip()
+    if s.isdigit():
+        return datetime.fromtimestamp(int(s) / 1000, tz=timezone.utc).date()
+    m = _DMY.match(s)
+    if m:
+        return date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+    return parse_iso_date(s)
 
 
 class DiavgeiaAdapter(SourceAdapter):
@@ -57,12 +74,15 @@ class DiavgeiaAdapter(SourceAdapter):
             yield from self._fetch_org(str(uid))
 
     def _fetch_org(self, uid: str) -> Iterable[SourceRecord]:
+        # Filter by org via the Lucene `q` — the value MUST be quoted (a bare/
+        # unquoted field is ignored) and an in-`q` issueDate range 400s, so we
+        # pull newest-first and let the runner's lookback window bound age.
         resp = self.http.get(
             f"{self.cfg.endpoint}/search",
             params={
-                "q": f"organizationUid:{uid}",
-                "from_date": self._from_date().isoformat(),
+                "q": f'organizationUid:"{uid}"',
                 "size": str(self.cfg.options.get("page_size", 100)),
+                "sort": "recent",
             },
             accept="application/json",
         )
@@ -92,7 +112,7 @@ class DiavgeiaAdapter(SourceAdapter):
             title=dec.get("subject") or ada,
             type=(dec_type.get("label") if isinstance(dec_type, dict) else dec_type) or "Απόφαση",
             authority=(org.get("label") if isinstance(org, dict) else org) or "",
-            date_published=parse_iso_date(dec.get("issueDate") or dec.get("submissionTimestamp")),
+            date_published=_parse_diavgeia_date(dec.get("issueDate") or dec.get("submissionTimestamp")),
             url=doc_url or f"https://diavgeia.gov.gr/decision/view/{ada}",
             raw_body=raw_body,
             content_type=content_type,

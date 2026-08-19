@@ -51,17 +51,21 @@ sources:
 
   - name: Διαύγεια
     tier: 1
-    endpoint: "https://diavgeia.gov.gr/opendata"
+    # Opendata search is the luminapi endpoint (the /opendata/search path ignores
+    # the org filter). Adapter appends /search. Verified live 2026-08.
+    endpoint: "https://opendata.diavgeia.gov.gr/luminapi/api"
     cadence: "6h"
     authority_rank: 1
     enabled: false
     adapter: diavgeia
     options:
-      lookback_days: 7
+      lookback_days: 180
       page_size: 100
-      # Organization UIDs need verification at implementation (spec §5.1.3):
-      # ΕπΑντ, ΑΑΔΕ, ΕΦΕΤ, ΑΠΔΠΧ + the client's competent ministries.
-      organization_uids: []
+      # Diavgeia organization UIDs (from /opendata/organizations). Verified:
+      #   22963 = ΕΠΙΤΡΟΠΗ ΑΝΤΑΓΩΝΙΣΜΟΥ (ΕπΑντ)
+      #   22951 = ΑΡΧΗ ΠΡΟΣΤΑΣΙΑΣ ΔΕΔΟΜΕΝΩΝ ΠΡΟΣΩΠΙΚΟΥ ΧΑΡΑΚΤΗΡΑ (ΑΠΔΠΧ)
+      # TODO: add ΑΑΔΕ, ΕΦΕΤ + client's competent ministries (look up their UIDs).
+      organization_uids: [22963, 22951]
 
   - name: Βουλή
     tier: 1
