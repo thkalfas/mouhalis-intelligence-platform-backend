@@ -147,11 +147,13 @@ class PipelineRunner:
                 continue
             try:
                 item = self._process(record, known)
-            except PermanentError as exc:
+            except Exception as exc:  # isolate ANY item failure (AD-12) — a
+                # data-quality reject (PermanentError) OR a transient/network
+                # error must skip just this item, never crash the whole run.
                 report.errors += 1
                 report.error_details.append((getattr(record, "source_id", "?"), str(exc)))
                 self.log.log(source=adapter.name, event="process",
-                             status="skipped", error=str(exc))
+                             status="skipped", error=f"{type(exc).__name__}: {exc}")
                 get_alerter().fire(AlertLevel.WARNING,
                                    f"Item skipped: {exc}", source=adapter.name)
                 continue

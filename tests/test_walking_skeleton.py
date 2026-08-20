@@ -77,6 +77,19 @@ def test_rerun_is_idempotent(runner, gateway):
     )
 
 
+def test_run_isolates_unexpected_exception(runner):
+    # A non-PermanentError (e.g. a transient network error) mid-item must skip
+    # just that item and be recorded — never crash the whole run (AD-12).
+    def _boom(record, known):
+        raise RuntimeError("boom")
+
+    runner._process = _boom
+    report = runner.run(FakeSourceAdapter())
+    assert report.ingested == 4
+    assert report.errors == 4 and report.persisted == 0  # all isolated, none fatal
+    assert all("boom" in reason for _sid, reason in report.error_details)
+
+
 def test_cost_ledger_records_llm_calls(runner, gateway, ledger):
     runner.run(FakeSourceAdapter())
     # Two LLM classifier calls (maritime, ambiguous) + one interpretation call.

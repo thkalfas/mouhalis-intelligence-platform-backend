@@ -112,6 +112,14 @@ class FakeLLMBackend:
 
 
 class AnthropicBackend:  # pragma: no cover - needs network + key
+    # Explicit per-request timeout so a hung socket fails fast (a run once
+    # stalled ~2h) — the runner then isolates that item. Bounded retries.
+    _TIMEOUT_S = 120.0
+    _MAX_RETRIES = 2
+    # Output cap: interpretations are large structured JSON; 4k truncated some
+    # (→ "Unterminated string"). Env-overridable.
+    _MAX_TOKENS = int(os.environ.get("LEGAL_INTEL_LLM_MAX_TOKENS", "8000"))
+
     def __init__(self, api_key: Optional[str] = None):
         try:
             from anthropic import Anthropic  # lazy import (optional dep)
@@ -119,12 +127,15 @@ class AnthropicBackend:  # pragma: no cover - needs network + key
             raise RuntimeError(
                 "anthropic not installed. `pip install legal-intel[full]`"
             ) from exc
-        self._client = Anthropic(api_key=api_key or os.environ["ANTHROPIC_API_KEY"])
+        self._client = Anthropic(
+            api_key=api_key or os.environ["ANTHROPIC_API_KEY"],
+            timeout=self._TIMEOUT_S, max_retries=self._MAX_RETRIES,
+        )
 
     def complete(self, *, stage, model, prompt, system=""):
         msg = self._client.messages.create(
             model=model,
-            max_tokens=4000,
+            max_tokens=self._MAX_TOKENS,
             system=system or "",
             messages=[{"role": "user", "content": prompt}],
         )

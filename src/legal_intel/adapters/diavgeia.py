@@ -70,8 +70,15 @@ class DiavgeiaAdapter(SourceAdapter):
             self.log.log(source=self.name, event="fetch", status="degraded",
                          error="no organization_uids configured")
             return
+        # The opendata search returns duplicate decisions (repeated ΑΔΑ); de-dup
+        # within a fetch so the same page isn't re-processed/re-written.
+        seen: set[str] = set()
         for uid in org_uids:
-            yield from self._fetch_org(str(uid))
+            for rec in self._fetch_org(str(uid)):
+                if rec.source_id in seen:
+                    continue
+                seen.add(rec.source_id)
+                yield rec
 
     def _fetch_org(self, uid: str) -> Iterable[SourceRecord]:
         # Filter by org via the Lucene `q` — the value MUST be quoted (a bare/
