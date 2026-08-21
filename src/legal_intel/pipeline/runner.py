@@ -158,6 +158,10 @@ class PipelineRunner:
                                    f"Item skipped: {exc}", source=adapter.name)
                 continue
 
+            if item is None:  # already persisted, unchanged (idempotent skip)
+                report.skipped += 1
+                continue
+
             self.gateway.upsert_item(item)
             report.persisted += 1
             cls = item.content_class.value if item.content_class else "unclassified"
@@ -176,8 +180,17 @@ class PipelineRunner:
         self._transition(item, ItemStatus.CLASS_A_DRAFT_INTERPRETATION)
         return item
 
-    def _process(self, record, known: list[Item]) -> Item:
+    def _process(self, record, known: list[Item]) -> Optional[Item]:
         item = normalize_mod.normalize(record)  # may raise PermanentError
+
+        # Cross-run idempotency (AD-4): an identical re-fetch — same source + same
+        # content hash → same upsert key — is already persisted. Skip it entirely:
+        # no re-triage, no re-interpretation, no LLM cost. (A genuine content
+        # change yields a new hash/key and is processed normally.)
+        if self.gateway.exists(item.upsert_key()):
+            self.log.log(source=record.source_name, event="process",
+                         status="unchanged", item_id=record.source_id)
+            return None
 
         outcome = dedup_mod.dedup(item, known, self.cfg)
         item = outcome.item

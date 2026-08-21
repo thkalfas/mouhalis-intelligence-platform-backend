@@ -64,17 +64,18 @@ def test_class_reasoning_envelope(runner, gateway):
     assert c.class_reasoning.decided_by.value == "llm"
 
 
-def test_rerun_is_idempotent(runner, gateway):
-    first = runner.run(FakeSourceAdapter())
+def test_rerun_is_idempotent(runner, gateway, ledger):
+    runner.run(FakeSourceAdapter())
     count_after_first = gateway.count()
+    llm_calls_after_first = len(ledger.rows)
 
     second = runner.run(FakeSourceAdapter())
-    # No new Items on the second pass — upsert-by-key + dedup hold (AD-4, AD-14).
+    # No new Items on the second pass — upsert-by-key + idempotent skip (AD-4/14).
     assert gateway.count() == count_after_first == 3
-    # Second pass reclassifies nothing (already-classified items are skipped).
-    assert second.by_class == {} or all(
-        v == first.by_class.get(k) for k, v in second.by_class.items()
-    )
+    # The cost guarantee: an identical re-fetch triggers NO new LLM calls
+    # (unchanged items are skipped before triage/interpretation).
+    assert len(ledger.rows) == llm_calls_after_first
+    assert second.skipped >= 3  # the unchanged items were skipped
 
 
 def test_run_isolates_unexpected_exception(runner):

@@ -208,6 +208,11 @@ class NotionGateway:
                 out.append(self.upsert_item(it))  # idempotent per item
         return out
 
+    def exists(self, upsert_key: str) -> bool:
+        """True if an Item with this exact upsert key (source + content hash) is
+        already persisted — used for cross-run idempotency (AD-4)."""
+        return self._backend.find_page_id(upsert_key) is not None
+
     def get_item(self, page_id: str) -> Optional[dict]:
         return self._backend.get_page(page_id)
 
