@@ -1,0 +1,14 @@
+# Never ship secrets or local cruft into the image
+.env
+.env.*
+.venv/
+.git/
+.gitignore
+.pytest_cache/
+__pycache__/
+*.pyc
+tests/
+_bmad-output/
+*.md
+!README.md
+data/

@@ -24,13 +24,14 @@ sources:
   - name: EUR-Lex
     tier: 1
     endpoint: "http://publications.europa.eu/webapi/rdf/sparql"
-    cadence: "30m"
+    cadence: "daily"          # POC: driven by the Railway cron
     authority_rank: 1
-    enabled: false
+    enabled: true             # validated live (POC)
     adapter: eurlex
     options:
-      lookback_days: 7
+      lookback_days: 30       # daily run headroom; global max_age_days still bounds age
       language: ENG
+      content_language: el
       limit: 100
       resource_types: [REG, DIR, JUDG, ORDER, OPIN_JUR]
       # EuroVoc pre-filter for the client's compliance domains (spec §5.1.1).
@@ -54,13 +55,13 @@ sources:
     # Opendata search is the luminapi endpoint (the /opendata/search path ignores
     # the org filter). Adapter appends /search. Verified live 2026-08.
     endpoint: "https://opendata.diavgeia.gov.gr/luminapi/api"
-    cadence: "6h"
+    cadence: "daily"          # POC: driven by the Railway cron
     authority_rank: 1
-    enabled: false
+    enabled: true             # validated live (POC)
     adapter: diavgeia
     options:
       lookback_days: 180
-      page_size: 100
+      page_size: 40           # bound the daily admin-noise volume (POC)
       # Diavgeia organization UIDs (from /opendata/organizations). Verified:
       #   22963 = ΕΠΙΤΡΟΠΗ ΑΝΤΑΓΩΝΙΣΜΟΥ (ΕπΑντ)
       #   22951 = ΑΡΧΗ ΠΡΟΣΤΑΣΙΑΣ ΔΕΔΟΜΕΝΩΝ ΠΡΟΣΩΠΙΚΟΥ ΧΑΡΑΚΤΗΡΑ (ΑΠΔΠΧ)

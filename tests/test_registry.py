@@ -37,12 +37,12 @@ def test_missing_adapter_key_raises():
         build_adapter(cfg)
 
 
-def test_no_sources_enabled_by_default():
+def test_only_validated_sources_enabled():
     app_cfg = load_config()
-    adapters = build_enabled_adapters(app_cfg)
-    # Production-safe default: nothing runs (incl. the demo FakeSource) until a
-    # real source is explicitly enabled + credentialed. No fake items reach Notion.
-    assert adapters == []
+    names = [a.name for a in build_enabled_adapters(app_cfg)]
+    # POC: exactly the two live-validated Tier-1 sources are enabled. FakeSource
+    # is disabled (no synthetic items) and unverified sources stay off.
+    assert names == ["EUR-Lex", "Διαύγεια"]
 
 
 def test_real_config_carries_adapter_options():
@@ -50,4 +50,4 @@ def test_real_config_carries_adapter_options():
     eurlex = next(s for s in app_cfg.sources if s.name == "EUR-Lex")
     assert eurlex.adapter == "eurlex"
     assert "tobacco industry" in eurlex.options["eurovoc_descriptors"]
-    assert eurlex.options["lookback_days"] == 7
+    assert eurlex.options["lookback_days"] == 30

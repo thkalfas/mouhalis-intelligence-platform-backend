@@ -21,6 +21,15 @@ full = [
     "pdfplumber",
     "apscheduler>=3,<4",
 ]
+# POC runtime: Tier-1 sources (EUR-Lex, Διαύγεια) + real Notion/Claude. No
+# Playwright (that's Tier-2 scraping) or apscheduler (cron is external). Used by
+# the Railway container image.
+poc = [
+    "notion-client==3.1.0",
+    "anthropic",
+    "httpx",
+    "pdfplumber",
+]
 dev = [
     "pytest>=8",
 ]
