@@ -155,7 +155,8 @@ class PipelineRunner:
                 self.log.log(source=adapter.name, event="process",
                              status="skipped", error=f"{type(exc).__name__}: {exc}")
                 get_alerter().fire(AlertLevel.WARNING,
-                                   f"Item skipped: {exc}", source=adapter.name)
+                                   f"Item skipped: {exc}", source=adapter.name,
+                                   category="item_skip")  # digest-only, never Slack
                 continue
 
             if item is None:  # already persisted, unchanged (idempotent skip)

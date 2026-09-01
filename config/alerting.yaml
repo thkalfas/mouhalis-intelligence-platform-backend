@@ -1,0 +1,60 @@
+# Alerting & notifications (FR-20). Routing is DATA — retune channels, levels,
+# and thresholds here without a code change. Secrets (the Slack webhook URL, the
+# email API key or SMTP password) are NEVER in this file: they are injected as
+# environment variables, named below via *_env keys.
+#
+# Model:
+#   * Slack  — real-time, 1-by-1: an operator sees breakages/anomalies as they
+#              happen. Routine per-item noise is deliberately kept OUT (see
+#              digest_only_categories) so the channel stays signal.
+#   * Email  — a once-per-run digest: the day's per-source outcome, totals, cost,
+#              and every alert that fired, in one message.
+
+enabled: true
+
+slack:
+  enabled: true
+  # The incoming-webhook URL is bound to the #mouhalis-legal-intel channel and
+  # supplied as a secret env var — never inline here.
+  webhook_url_env: SLACK_WEBHOOK_URL
+  channel: "#mouhalis-legal-intel"      # informational label only
+  # Real-time (1-by-1) Slack ping for events at or above this level...
+  min_level: warning                     # info | warning | critical
+  # ...EXCEPT these categories, which are digest-only (keeps routine per-item
+  # rejects out of the channel). Everything else at/above min_level pings Slack.
+  digest_only_categories: [item_skip]
+  # Prepend a mention on CRITICAL alerts, e.g. "<!channel>" or "<@U0123ABCD>".
+  # Blank = no mention.
+  mention_on_critical: ""
+  # Suppress duplicate identical alerts within a single run.
+  dedupe_within_run: true
+
+email:
+  enabled: true
+  provider: resend                       # resend | smtp
+  cadence: daily                         # one digest per run (the daily cron)
+  recipients:
+    - antonis.ventouris@reborrn.com
+  # A verified sender. For Resend you can use onboarding@resend.dev to send to
+  # your OWN address while a domain is being verified; switch to an @reborrn.com
+  # sender once the domain is set up in Resend.
+  from: "Mouhalis Legal Intel <onboarding@resend.dev>"
+  subject_prefix: "[Mouhalis Legal Intel]"
+  # Only send the digest when the run produced something at/above this level.
+  # "info" => always send (daily heartbeat). "warning" => email only on problems.
+  min_level: info
+  resend:
+    api_key_env: RESEND_API_KEY
+    # Resend routes by the account/domain region; set the domain to EU in the
+    # Resend dashboard for data residency. base_url stays the same.
+    base_url: "https://api.resend.com"
+  smtp:
+    host_env: SMTP_HOST
+    port: 587
+    user_env: SMTP_USER
+    password_env: SMTP_PASSWORD
+    starttls: true
+
+thresholds:
+  # Total spend for the run above this (USD) raises a cost_spike alert (Slack).
+  cost_daily_usd: 5.0

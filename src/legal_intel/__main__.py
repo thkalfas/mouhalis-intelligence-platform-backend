@@ -49,6 +49,9 @@ from datetime import datetime, timezone
 from .adapters.registry import build_adapter
 from .core.models import Item
 from .pipeline.runner import PipelineRunner
+from .platform.alerting import AlertLevel, get_alerter
+from .platform.notifications import (NotificationRouter, RunSummary,
+                                     SourceOutcome, load_alerting_config)
 from .platform.source_health import (SourceHealth, SourceHealthWriter,
                                      status_from_report)
 
@@ -56,6 +59,13 @@ from .platform.source_health import (SourceHealth, SourceHealthWriter,
 def main() -> None:
     runner = PipelineRunner()
     health = SourceHealthWriter()  # no-op unless the Notion board is configured
+    # Notifications (FR-20): attach the Slack + email-digest router as the global
+    # alerter's dispatch, so every fire() during the run routes to Slack in real
+    # time and is buffered for the end-of-run digest. Missing secrets => no-op.
+    alert_cfg = load_alerting_config()
+    router = NotificationRouter(alert_cfg)
+    get_alerter().set_dispatch(router)
+    started_at = datetime.now(timezone.utc)
     # Config-driven wiring (AD-3, AD-8): run whichever sources are enabled in
     # sources.yaml. Offline, that is just FakeSource; enabling a real adapter is
     # a config flip (plus its network prerequisites). Each source's outcome is
@@ -63,6 +73,7 @@ def main() -> None:
     sources = runner.cfg.enabled_sources()
     ingested = persisted = errors = 0
     by_class: dict[str, int] = {}
+    outcomes: list[SourceOutcome] = []
     for src in sources:
         now = datetime.now(timezone.utc)
         try:
@@ -75,12 +86,20 @@ def main() -> None:
             errors += 1
             runner.log.log(source=src.name, event="source_run", status="failed",
                            error=str(exc))
+            # A source going dark is an operator-facing breakage → real-time Slack.
+            get_alerter().fire(AlertLevel.CRITICAL,
+                               f"Source '{src.name}' failed: {str(exc)[:200]}",
+                               source=src.name, category="source_failure")
         health.record(SourceHealth(
             source=src.name, tier=src.tier, adapter=src.adapter or "", enabled=src.enabled,
             status=status, cadence=src.cadence, authority_rank=src.authority_rank,
             items_collected=(report.persisted if report else 0),
             filtered=(report.filtered if report else 0),
             errors=(report.errors if report else 1), notes=note, last_run=now))
+        outcomes.append(SourceOutcome(
+            source=src.name, status=status,
+            persisted=(report.persisted if report else 0),
+            errors=(report.errors if report else 1), note=note))
         if report is not None:
             ingested += report.ingested
             persisted += report.persisted
@@ -105,7 +124,24 @@ def main() -> None:
         print(f"  [{cls}] {item.status.value:32} {has_text:9} {has_interp:12} {item.title[:60]}")
 
     print("\n=== Cost ledger (monthly report) ===")
+    # monthly_report() may itself fire cost/failure-rate alerts — do it before the
+    # digest so those land in the same email.
     print(json.dumps(runner.ledger.monthly_report(), indent=2, ensure_ascii=False))
+
+    cost_usd = runner.ledger.total_usd()
+    if cost_usd > alert_cfg.thresholds.cost_daily_usd:
+        get_alerter().fire(AlertLevel.WARNING,
+                           f"Run cost ${cost_usd:.2f} exceeded daily threshold "
+                           f"${alert_cfg.thresholds.cost_daily_usd:.2f}",
+                           source="alerting", category="cost_spike")
+
+    # One digest per run (the daily cron => one email/day). No-op if email is
+    # unconfigured (no RESEND_API_KEY / SMTP host).
+    router.send_digest(RunSummary(
+        started_at=started_at, finished_at=datetime.now(timezone.utc),
+        sources=[s.name for s in sources], outcomes=outcomes,
+        ingested=ingested, persisted=persisted, errors=errors,
+        by_class=by_class, cost_usd=cost_usd))
 
 
 if __name__ == "__main__":

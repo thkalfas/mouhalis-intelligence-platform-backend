@@ -22,6 +22,11 @@ class Alerter:
         self._dispatch = dispatch
         self.alerts: list[tuple[AlertLevel, str, dict]] = []  # for tests
 
+    def set_dispatch(self, dispatch: Optional[Callable[[AlertLevel, str, dict], None]]) -> None:
+        """Attach the delivery channel (Slack/email router) at startup, so every
+        ``fire`` call routes without threading the router through call sites."""
+        self._dispatch = dispatch
+
     def fire(self, level: AlertLevel, message: str, **context) -> None:
         self.alerts.append((level, message, context))
         # `source`/`error` are fixed log columns — let callers supply them via
