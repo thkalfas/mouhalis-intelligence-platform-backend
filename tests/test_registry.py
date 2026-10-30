@@ -40,9 +40,9 @@ def test_missing_adapter_key_raises():
 def test_only_validated_sources_enabled():
     app_cfg = load_config()
     names = [a.name for a in build_enabled_adapters(app_cfg)]
-    # POC: exactly the two live-validated Tier-1 sources are enabled. FakeSource
-    # is disabled (no synthetic items) and unverified sources stay off.
-    assert names == ["EUR-Lex", "Διαύγεια"]
+    # Phase 1: six Tier-1 sources enabled (EUR-Lex, Διαύγεια validated live;
+    # Βουλή, EDPB, EFSA, GDPRhub activated for live testing).
+    assert names == ["EUR-Lex", "Διαύγεια", "Βουλή", "EDPB", "EFSA", "GDPRhub"]
 
 
 def test_real_config_carries_adapter_options():

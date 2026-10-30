@@ -1,13 +1,19 @@
-"""Generic RSS/Atom adapter (Story 1.4, FR-1) — serves EDPB and EFSA.
+"""Generic RSS/Atom adapter (Story 1.4, FR-1) — serves EDPB, EFSA, Βουλή.
 
-Both sources publish RSS 2.0 feeds whose real content is a PDF behind the link;
+Most sources publish RSS 2.0 feeds whose real content is a PDF behind the link;
 we capture identity + the feed summary now (extraction of the linked PDF is a
-later enrichment). One config-driven class covers both — the source name,
+later enrichment). One config-driven class covers all — the source name,
 authority, feed URL, and default type all come from ``sources.yaml`` (AD-8).
+
+Feeds without a ``<pubDate>`` (e.g. Βουλή) can specify a ``date_regex`` in
+options to extract the date from the description/summary text, plus a
+``date_format`` (strptime pattern, default ``%d/%m/%Y``).
 """
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
+from datetime import datetime
 from typing import Optional
 
 from ..core.config import SourceConfig
@@ -27,6 +33,22 @@ class RssAdapter(SourceAdapter):
         self.http = http or HttpClient()
         self.log = get_logger()
 
+    def _extract_date(self, pub_date_raw: Optional[str],
+                      summary: Optional[str]):
+        date_pub = parse_rfc822_date(pub_date_raw) or parse_iso_date(pub_date_raw)
+        if date_pub is not None:
+            return date_pub
+        date_regex = self.cfg.options.get("date_regex")
+        if date_regex and summary:
+            m = re.search(date_regex, summary)
+            if m:
+                fmt = self.cfg.options.get("date_format", "%d/%m/%Y")
+                try:
+                    return datetime.strptime(m.group(1), fmt).date()
+                except (ValueError, IndexError):
+                    pass
+        return None
+
     def fetch(self) -> Iterable[SourceRecord]:
         resp = self.http.get(self.cfg.endpoint, accept="application/rss+xml")
         try:
@@ -39,7 +61,8 @@ class RssAdapter(SourceAdapter):
         default_type = self.cfg.options.get("default_type", "Publication")
         for it in items:
             link = it.get("link", "")
-            date_pub = parse_rfc822_date(it.get("pubDate")) or parse_iso_date(it.get("pubDate"))
+            summary = it.get("summary") or None
+            date_pub = self._extract_date(it.get("pubDate"), summary)
             yield SourceRecord(
                 source_id=it.get("guid") or link,
                 source_name=self.name,
@@ -48,6 +71,6 @@ class RssAdapter(SourceAdapter):
                 authority=authority,
                 date_published=date_pub,
                 url=link,
-                full_text=it.get("summary") or None,
+                full_text=summary,
                 raw_metadata={"rss": it},
             )

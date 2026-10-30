@@ -70,22 +70,23 @@ sources:
 
   - name: Βουλή
     tier: 1
-    endpoint: "https://www.hellenicparliament.gr/api.ashx"
+    endpoint: "https://www.hellenicparliament.gr/rssfeed/RssSubmittedBills.aspx"
     cadence: "daily@08:00"
     authority_rank: 1
-    enabled: false
-    adapter: vouli
+    enabled: true
+    adapter: rss
     options:
-      method: Bills
-      period: 20
+      authority: Βουλή των Ελλήνων
       default_type: Νομοσχέδιο
+      date_regex: "κατάθεσης: </b>(\\d{2}/\\d{2}/\\d{4})"
+      date_format: "%d/%m/%Y"
 
   - name: EDPB
     tier: 1
-    endpoint: "https://www.edpb.europa.eu/rss/documents_en.rss"
+    endpoint: "https://www.edpb.europa.eu/rss.xml_en"
     cadence: "daily@09:00"
     authority_rank: 1
-    enabled: false
+    enabled: true
     adapter: rss
     options:
       authority: EDPB
@@ -93,10 +94,10 @@ sources:
 
   - name: EFSA
     tier: 1
-    endpoint: "https://www.efsa.europa.eu/en/rss/all"
+    endpoint: "https://www.efsa.europa.eu/en/all/rss"
     cadence: "daily@09:00"
     authority_rank: 1
-    enabled: false
+    enabled: true
     adapter: rss
     options:
       authority: EFSA
@@ -107,7 +108,7 @@ sources:
     endpoint: "https://gdprhub.eu/api.php"
     cadence: "daily@10:00"
     authority_rank: 2
-    enabled: false
+    enabled: true
     adapter: gdprhub
     options:
       namespace: 0
