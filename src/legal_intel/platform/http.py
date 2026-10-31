@@ -58,16 +58,17 @@ class Transport(Protocol):
         *,
         params: Optional[dict[str, str]] = None,
         headers: Optional[dict[str, str]] = None,
+        body: Optional[bytes] = None,
     ) -> HttpResponse: ...
 
 
 def _httpx_transport(timeout: float) -> Transport:
-    def _send(method, url, *, params=None, headers=None) -> HttpResponse:
+    def _send(method, url, *, params=None, headers=None, body=None) -> HttpResponse:
         import httpx  # lazy — only the real transport needs it
 
         resp = httpx.request(
             method, url, params=params, headers=headers,
-            timeout=timeout, follow_redirects=True,
+            content=body, timeout=timeout, follow_redirects=True,
         )
         return HttpResponse(
             status_code=resp.status_code,
@@ -114,11 +115,30 @@ class HttpClient:
             merged.update(headers)
         return self._request("GET", url, params=params, headers=merged)
 
-    def _request(self, method, url, *, params, headers) -> HttpResponse:
+    def post_json(
+        self,
+        url: str,
+        payload: dict,
+        *,
+        headers: Optional[dict[str, str]] = None,
+    ) -> HttpResponse:
+        import json as _json
+
+        merged = dict(self._default_headers)
+        merged["Content-Type"] = "application/json"
+        if headers:
+            merged.update(headers)
+        return self._request(
+            "POST", url, params=None, headers=merged,
+            body=_json.dumps(payload).encode(),
+        )
+
+    def _request(self, method, url, *, params, headers, body=None) -> HttpResponse:
         last_exc: Optional[Exception] = None
         # len(backoff) retries after the initial attempt.
         for attempt in range(len(self._backoff) + 1):
-            resp = self._transport(method, url, params=params, headers=headers)
+            resp = self._transport(method, url, params=params, headers=headers,
+                                    body=body)
             if resp.status_code in _PERMANENT_STATUS:
                 raise PermanentError(f"HTTP {resp.status_code} for {url}")
             if resp.status_code in _RETRY_STATUS:

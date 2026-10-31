@@ -32,7 +32,7 @@ _REGISTRY: dict[str, str] = {
     "datagovgr": "legal_intel.adapters.datagovgr:DataGovGrAdapter",
     # Tier 2
     "html_list": "legal_intel.adapters.tier2:HtmlListScraper",
-    "fek": "legal_intel.adapters.tier2:HtmlListScraper",
+    "fek": "legal_intel.adapters.fek:FekAdapter",
     "ste": "legal_intel.adapters.tier2:HtmlListScraper",
     "efet": "legal_intel.adapters.tier2:HtmlListScraper",
     "dpa": "legal_intel.adapters.tier2:HtmlListScraper",

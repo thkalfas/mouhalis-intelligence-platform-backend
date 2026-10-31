@@ -132,16 +132,14 @@ sources:
   # against the live page at activation (spec §5.2). All routing is via the
   # politeness-enforcing ScrapeClient (AD-10).
   - name: ΦΕΚ
-    tier: 2
-    endpoint: "https://search.et.gr/en/"
+    tier: 1
+    endpoint: "https://searchetv99.azurewebsites.net/api/searchbydate"
     cadence: "12h"
     authority_rank: 1
-    enabled: false
+    enabled: true
     adapter: fek
     options:
-      row_tag: div
-      row_class: result-item
-      link_contains: ".pdf"
+      lookback_days: 7
       default_type: ΦΕΚ
       authority: Εθνικό Τυπογραφείο
 
@@ -172,24 +170,15 @@ sources:
       note: "Primary coverage is via the Διαύγεια source with the ΕπΑντ org UID."
 
   - name: ΕΦΕΤ
-    tier: 2
-    endpoint: "https://www.efet.gr/index.php/el/enimerosi/deltia-typou/anakleiseis-cat"
+    tier: 1
+    endpoint: "https://www.efet.gr/index.php/el/enimerosi/deltia-typou/anakleiseis-cat?format=feed&type=rss"
     cadence: "4h"
     authority_rank: 1
-    enabled: false
-    adapter: efet
+    enabled: true
+    adapter: rss
     options:
-      row_tag: div
-      row_class: item
-      default_type: Ανάκληση
       authority: ΕΦΕΤ
-      parse_hazard: true
-      hazards:
-        - {keyword: "listeria", label: "Listeria"}
-        - {keyword: "salmonella", label: "Salmonella"}
-        - {keyword: "υδράργυρ", label: "Υδράργυρος"}
-        - {keyword: "αλλεργιογ", label: "Αλλεργιογόνο"}
-        - {keyword: "μυκοτοξ", label: "Μυκοτοξίνες"}
+      default_type: Ανάκληση
 
   - name: RASFF
     tier: 2
