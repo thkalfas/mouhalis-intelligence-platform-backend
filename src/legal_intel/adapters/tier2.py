@@ -183,6 +183,26 @@ _DATE_PATTERNS = (
     (re.compile(r"(\d{1,2})-(\d{1,2})-(\d{4})"), (3, 2, 1)),  # 08-07-2026
 )
 
+_GREEK_MONTHS = {
+    "ιανουαρ": 1, "φεβρουαρ": 2, "μαρτ": 3, "απριλ": 4,
+    "μαΐ": 5, "μαϊ": 5, "ιουν": 6, "ιουλ": 7, "αυγούστ": 8,
+    "σεπτεμβρ": 9, "οκτωβρ": 10, "νοεμβρ": 11, "δεκεμβρ": 12,
+}
+_GREEK_DATE_RE = re.compile(r"(\d{1,2})\s+(\S+?)\s+(\d{4})")
+
+
+def _parse_greek_date(text: str):
+    from datetime import date
+    for m in _GREEK_DATE_RE.finditer(text):
+        month_text = m.group(2).lower()
+        for prefix, month_num in _GREEK_MONTHS.items():
+            if month_text.startswith(prefix):
+                try:
+                    return date(int(m.group(3)), month_num, int(m.group(1)))
+                except ValueError:
+                    break
+    return None
+
 
 def parse_any_date(text: str):
     from datetime import date
@@ -193,7 +213,7 @@ def parse_any_date(text: str):
                 return date(int(mt.group(y)), int(mt.group(m)), int(mt.group(d)))
             except ValueError:
                 continue
-    return None
+    return _parse_greek_date(text)
 
 
 class HtmlListScraper(Tier2Scraper):

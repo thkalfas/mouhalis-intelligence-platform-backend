@@ -162,11 +162,11 @@ sources:
     endpoint: "https://www.epant.gr/apofaseis-gnomodotiseis.html"
     cadence: "weekly@Mon09:00"   # weekly direct cross-check; primary path is Δι@ύγεια
     authority_rank: 1
-    enabled: false
+    enabled: true
     adapter: epant
     options:
       row_tag: div
-      row_class: item
+      row_class: catItemView
       default_type: Απόφαση ΕπΑντ
       authority: Επιτροπή Ανταγωνισμού
       note: "Primary coverage is via the Διαύγεια source with the ΕπΑντ org UID."
@@ -217,11 +217,10 @@ sources:
     endpoint: "https://www.dpa.gr/el/enimerwtiko/prakseisArxis"
     cadence: "weekly@Tue09:00"
     authority_rank: 1
-    enabled: false
+    enabled: true
     adapter: dpa
     options:
-      row_tag: div
-      row_class: item
+      row_tag: tr
       default_type: Πράξη ΑΠΔΠΧ
       authority: ΑΠΔΠΧ
 

@@ -40,9 +40,10 @@ def test_missing_adapter_key_raises():
 def test_only_validated_sources_enabled():
     app_cfg = load_config()
     names = [a.name for a in build_enabled_adapters(app_cfg)]
-    # Phase 1: six Tier-1 sources enabled (EUR-Lex, Διαύγεια validated live;
-    # Βουλή, EDPB, EFSA, GDPRhub activated for live testing).
-    assert names == ["EUR-Lex", "Διαύγεια", "Βουλή", "EDPB", "EFSA", "GDPRhub"]
+    # Phase 2: six Tier-1 + two Tier-2 sources enabled. Tier-2 scrapers
+    # (ΕπΑντ, dpa.gr) activated for dedup overlap testing.
+    assert names == ["EUR-Lex", "Διαύγεια", "Βουλή", "EDPB", "EFSA", "GDPRhub",
+                     "ΕπΑντ", "dpa.gr"]
 
 
 def test_real_config_carries_adapter_options():
