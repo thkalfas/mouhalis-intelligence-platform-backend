@@ -62,11 +62,21 @@ sources:
     options:
       lookback_days: 180
       page_size: 40           # bound the daily admin-noise volume (POC)
-      # Diavgeia organization UIDs (from /opendata/organizations). Verified:
-      #   22963 = ΕΠΙΤΡΟΠΗ ΑΝΤΑΓΩΝΙΣΜΟΥ (ΕπΑντ)
-      #   22951 = ΑΡΧΗ ΠΡΟΣΤΑΣΙΑΣ ΔΕΔΟΜΕΝΩΝ ΠΡΟΣΩΠΙΚΟΥ ΧΑΡΑΚΤΗΡΑ (ΑΠΔΠΧ)
-      # TODO: add ΑΑΔΕ, ΕΦΕΤ + client's competent ministries (look up their UIDs).
-      organization_uids: [22963, 22951]
+      # Diavgeia organization UIDs (from /luminapi/api/organizations).
+      #   22963   = ΕΠΙΤΡΟΠΗ ΑΝΤΑΓΩΝΙΣΜΟΥ (ΕπΑντ)
+      #   22951   = ΑΡΧΗ ΠΡΟΣΤΑΣΙΑΣ ΔΕΔΟΜΕΝΩΝ ΠΡΟΣΩΠΙΚΟΥ ΧΑΡΑΚΤΗΡΑ (ΑΠΔΠΧ)
+      organization_uids:
+        - 22963       # ΕπΑντ
+        - 22951       # ΑΠΔΠΧ
+        - 100029495   # ΑΑΔΕ (excise / customs)
+        - 50002       # ΕΦΕΤ (food safety)
+        - 100015981   # Υπ. Αγροτικής Ανάπτυξης
+        - 100081597   # Υπ. Ανάπτυξης
+        - 15          # Υπ. Οικονομικών
+        - 100054486   # Υπ. Ψηφιακής Διακυβέρνησης
+        - 100010899   # Υπ. Υγείας
+        - 100015996   # Υπ. Περιβάλλοντος & Ενέργειας
+        - 99221514    # ΕΟΦ
 
   - name: Βουλή
     tier: 1
