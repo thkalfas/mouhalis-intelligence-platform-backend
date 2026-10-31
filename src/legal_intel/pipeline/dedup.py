@@ -46,6 +46,16 @@ class DedupOutcome:
 # --------------------------------------------------------------------------- #
 # Scoring
 # --------------------------------------------------------------------------- #
+def _normalize_authority(name: str, aliases: dict[str, str]) -> str:
+    """Case-fold and apply configured aliases so the same real-world authority
+    matches regardless of how each source spells or abbreviates it."""
+    folded = name.strip().casefold()
+    canon = aliases.get(folded)
+    if canon is not None:
+        return canon.casefold()
+    return folded
+
+
 def _title_similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
@@ -73,7 +83,10 @@ def score(candidate: Item, existing: Item, cfg: AppConfig) -> float:
         total += w.text_hash
     if _title_similarity(candidate.title, existing.title) >= th.title_similarity_min:
         total += w.title_similarity
-    if (existing.authority and candidate.authority == existing.authority
+    aliases = cfg.dedup.authority_aliases
+    if (existing.authority
+            and _normalize_authority(candidate.authority or "", aliases)
+            == _normalize_authority(existing.authority, aliases)
             and candidate.date_published is not None
             and candidate.date_published == existing.date_published):
         total += w.authority_date

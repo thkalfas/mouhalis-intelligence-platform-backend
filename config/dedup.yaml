@@ -14,3 +14,18 @@ thresholds:
   topic_overlap_min: 0.70     # topic/entity overlap above which that signal fires
   auto_merge: 0.95            # aggregate ≥ this → certain duplicate (auto-merge)
   confirm_low: 0.70           # aggregate in [confirm_low, auto_merge) → human confirm
+
+# Authority name aliases (case-folded lookup → canonical form). Needed because
+# the same authority appears under different spellings across sources: e.g.
+# Διαύγεια API returns the uppercase official name while sources.yaml uses the
+# common abbreviation. Both sides are case-folded before comparison.
+authority_aliases:
+  "αρχη προστασιασ δεδομενων προσωπικου χαρακτηρα": "ΑΠΔΠΧ"
+  "απδπχ": "ΑΠΔΠΧ"
+  "ενιαιοσ φορεασ ελεγχου τροφιμων": "ΕΦΕΤ"
+  "ενιαιοσ φορεασ ελεγχου τροφιμων (ε.φ.ε.τ. )": "ΕΦΕΤ"
+  "εφετ": "ΕΦΕΤ"
+  "επιτροπη ανταγωνισμου": "Επιτροπή Ανταγωνισμού"
+  "επιτροπή ανταγωνισμού": "Επιτροπή Ανταγωνισμού"
+  "εθνικοσ οργανισμοσ φαρμακων (εοφ)": "ΕΟΦ"
+  "εοφ": "ΕΟΦ"

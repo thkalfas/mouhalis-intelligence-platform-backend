@@ -142,6 +142,7 @@ class DedupThresholds(BaseModel):
 class DedupConfig(BaseModel):
     weights: DedupWeights = Field(default_factory=DedupWeights)
     thresholds: DedupThresholds = Field(default_factory=DedupThresholds)
+    authority_aliases: dict[str, str] = Field(default_factory=dict)
 
 
 class AppConfig(BaseModel):
