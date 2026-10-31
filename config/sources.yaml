@@ -181,17 +181,16 @@ sources:
       default_type: Ανάκληση
 
   - name: RASFF
-    tier: 2
-    endpoint: "https://webgate.ec.europa.eu/rasff-window/screen/list"
+    tier: 1
+    endpoint: "https://webgate.ec.europa.eu/rasff-window/backend/public/notification/search/consolidated/en/"
     cadence: "4h"
     authority_rank: 1
-    enabled: false
+    enabled: true
     adapter: rasff
     options:
-      mechanism: apitalks   # "apitalks" (paid REST) | "scrape" (JS-capable fetcher)
-      apitalks_endpoint: ""
-      apitalks_key_header: "x-api-key"
-      apitalks_key: ""
+      mechanism: public     # "public" (free backend API) | "apitalks" (paid REST) | "scrape" (JS fetcher)
+      lookback_days: 7
+      items_per_page: 25
       default_type: RASFF Notification
       authority: RASFF
       hazards:

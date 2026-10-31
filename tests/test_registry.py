@@ -41,7 +41,7 @@ def test_only_validated_sources_enabled():
     app_cfg = load_config()
     names = [a.name for a in build_enabled_adapters(app_cfg)]
     assert names == ["EUR-Lex", "Διαύγεια", "Βουλή", "EDPB", "EFSA", "GDPRhub",
-                     "ΦΕΚ", "ΕπΑντ", "ΕΦΕΤ", "dpa.gr"]
+                     "ΦΕΚ", "ΕπΑντ", "ΕΦΕΤ", "RASFF", "dpa.gr"]
 
 
 def test_real_config_carries_adapter_options():
