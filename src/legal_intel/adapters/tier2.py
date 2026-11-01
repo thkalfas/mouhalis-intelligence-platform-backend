@@ -37,6 +37,7 @@ from ._util import now_utc
 class Row:
     text: str = ""
     links: list[tuple[str, str]] = field(default_factory=list)  # (href, text)
+    title_text: str = ""  # text from a config-driven title element (e.g. intro blurb)
 
     @property
     def first_link(self) -> Optional[tuple[str, str]]:
@@ -48,10 +49,12 @@ class RowExtractor(HTMLParser):
     capturing each row's visible text and anchor links. Handles nesting of the
     same tag."""
 
-    def __init__(self, row_tag: str = "tr", row_class: Optional[str] = None) -> None:
+    def __init__(self, row_tag: str = "tr", row_class: Optional[str] = None,
+                 title_class: Optional[str] = None) -> None:
         super().__init__(convert_charrefs=True)
         self._row_tag = row_tag.lower()
         self._row_class = row_class
+        self._title_class = title_class
         self.rows: list[Row] = []
         self._in_row = False
         self._depth = 0
@@ -59,6 +62,8 @@ class RowExtractor(HTMLParser):
         self._in_a = False
         self._a_href = ""
         self._a_text = ""
+        self._in_title_el = False
+        self._title_depth = 0
 
     def _class_matches(self, attrs: list[tuple[str, Optional[str]]]) -> bool:
         if not self._row_class:
@@ -75,6 +80,13 @@ class RowExtractor(HTMLParser):
                 self._in_row = True
                 self._depth = 1
                 self._cur = Row()
+        if self._in_row and self._title_class:
+            classes = (dict(attrs).get("class") or "").split()
+            if self._title_class in classes:
+                self._in_title_el = True
+                self._title_depth = 1
+            elif self._in_title_el:
+                self._title_depth += 1
         if tag == "a" and self._in_row:
             self._in_a = True
             self._a_href = dict(attrs).get("href") or ""
@@ -85,10 +97,16 @@ class RowExtractor(HTMLParser):
         if tag == "a" and self._in_a and self._cur is not None:
             self._cur.links.append((self._a_href, self._a_text.strip()))
             self._in_a = False
+        if self._in_title_el:
+            self._title_depth -= 1
+            if self._title_depth == 0:
+                self._in_title_el = False
         if tag == self._row_tag and self._in_row:
             self._depth -= 1
             if self._depth == 0:
                 self._cur.text = re.sub(r"\s+", " ", self._cur.text).strip()
+                self._cur.title_text = re.sub(
+                    r"\s+", " ", self._cur.title_text).strip()
                 self.rows.append(self._cur)
                 self._in_row = False
                 self._cur = None
@@ -98,11 +116,14 @@ class RowExtractor(HTMLParser):
             self._cur.text += data
             if self._in_a:
                 self._a_text += data
+            if self._in_title_el:
+                self._cur.title_text += data
 
 
 def extract_rows(html: str, row_tag: str = "tr",
-                 row_class: Optional[str] = None) -> list[Row]:
-    parser = RowExtractor(row_tag, row_class)
+                 row_class: Optional[str] = None,
+                 title_class: Optional[str] = None) -> list[Row]:
+    parser = RowExtractor(row_tag, row_class, title_class)
     parser.feed(html)
     return parser.rows
 
@@ -223,7 +244,8 @@ class HtmlListScraper(Tier2Scraper):
 
     def parse(self, html: str, url: str) -> list[SourceRecord]:
         o = self.cfg.options
-        rows = extract_rows(html, o.get("row_tag", "tr"), o.get("row_class"))
+        rows = extract_rows(html, o.get("row_tag", "tr"), o.get("row_class"),
+                            o.get("title_class"))
         link_contains = o.get("link_contains")
         id_regex = re.compile(o["id_regex"]) if o.get("id_regex") else None
         hazards = o.get("hazards", [])
@@ -237,6 +259,8 @@ class HtmlListScraper(Tier2Scraper):
             if link is None:
                 continue
             href, title = link
+            if row.title_text:
+                title = row.title_text
             abs_url = urljoin(url, href)
             source_id = self._source_id(href, id_regex)
             raw_metadata: dict = {"row_text": row.text}

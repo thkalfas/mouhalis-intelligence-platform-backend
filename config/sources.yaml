@@ -175,6 +175,7 @@ sources:
     options:
       row_tag: div
       row_class: catItemView
+      title_class: catItemIntroText
       default_type: Απόφαση ΕπΑντ
       authority: Επιτροπή Ανταγωνισμού
       note: "Primary coverage is via the Διαύγεια source with the ΕπΑντ org UID."
