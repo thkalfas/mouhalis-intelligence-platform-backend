@@ -104,6 +104,9 @@ class RelevanceRule(BaseModel):
     rule_id: str
     action: str  # "classify_A" | "classify_B"
     when: dict[str, Any] = Field(default_factory=dict)
+    # Human-readable explanation written to Notion's `Class Reasoning` when this
+    # rule fires. Keep it a single short Greek sentence the lawyer can read.
+    label: Optional[str] = None
 
 
 class InterpretationConfig(BaseModel):

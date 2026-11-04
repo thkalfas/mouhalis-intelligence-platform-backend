@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-from ..core.config import AppConfig
+from ..core.config import AppConfig, RelevanceRule
 from ..core.llm_client import MeteredLLMClient, extract_json
 from ..core.models import ClassReasoning, ContentClass, DecidedBy, Item
 
@@ -24,8 +24,10 @@ _CLASSIFIER_SYSTEM = (
 )
 
 
-def _apply_rules(item: Item, cfg: AppConfig) -> Optional[tuple[ContentClass, str]]:
-    """Return (class, rule_id) if a deterministic rule is decisive, else None."""
+def _apply_rules(
+    item: Item, cfg: AppConfig
+) -> Optional[tuple[ContentClass, RelevanceRule]]:
+    """Return (class, rule) if a deterministic rule is decisive, else None."""
     text = f"{item.title}\n{item.full_text or ''}".lower()
     for rule in cfg.relevance_rules:
         when = rule.when
@@ -33,15 +35,15 @@ def _apply_rules(item: Item, cfg: AppConfig) -> Optional[tuple[ContentClass, str
         if "text_contains_kad_any" in when:
             kads = when["text_contains_kad_any"] or cfg.kad_codes
             if any(str(k) in text for k in kads):
-                return (_class_for(rule.action), rule.rule_id)
+                return (_class_for(rule.action), rule)
         # include: high-priority topic hit
         if "topics_contains_any" in when:
             if set(when["topics_contains_any"]) & set(item.topics):
-                return (_class_for(rule.action), rule.rule_id)
+                return (_class_for(rule.action), rule)
         # exclude: all topics in an excluded set
         if "topics_all_in" in when and item.topics:
             if set(item.topics).issubset(set(when["topics_all_in"])):
-                return (_class_for(rule.action), rule.rule_id)
+                return (_class_for(rule.action), rule)
     return None
 
 
@@ -60,12 +62,12 @@ def triage(item: Item, cfg: AppConfig, llm: MeteredLLMClient) -> Item:
     # 1) Deterministic rules
     decided = _apply_rules(item, cfg)
     if decided is not None:
-        content_class, rule_id = decided
+        content_class, rule = decided
         item.content_class = content_class
         item.class_reasoning = ClassReasoning(
             decided_by=DecidedBy.RULE,
-            detail=f"Rule {rule_id} fired.",
-            rule_id=rule_id,
+            detail=rule.label or f"Rule {rule.rule_id} fired.",
+            rule_id=rule.rule_id,
         )
         _apply_retention(item)
         return item

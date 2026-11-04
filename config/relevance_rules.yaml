@@ -13,11 +13,13 @@ rules:
   # --- Explicit include (auto Class A) ---
   - rule_id: kad_direct_mention
     action: classify_A
+    label: "Αναφέρεται ρητά σε ΚΑΔ του πελάτη (46.35, 46.37, 46.38, 56.10, 56.30)."
     when:
       text_contains_kad_any: ["46.35", "46.37", "46.38", "56.10", "56.30"]
 
   - rule_id: high_priority_topic_hit
     action: classify_A
+    label: "Άπτεται θέματος άμεσης σχετικότητας (ιχνηλασιμότητα καπνού, ΕΦΚ, επισήμανση τροφίμων, ανάκληση προϊόντων ή κάθετες συμφωνίες)."
     when:
       topics_contains_any:
         - tobacco_traceability
@@ -29,6 +31,7 @@ rules:
   # --- Explicit exclude (auto Class B) ---
   - rule_id: unrelated_sectors
     action: classify_B
+    label: "Εκτός πεδίου δραστηριότητας (δασικά, στρατιωτικά, ναυτιλιακά, θρησκευτικά ή χωροταξία)."
     when:
       topics_all_in:
         - forestry
