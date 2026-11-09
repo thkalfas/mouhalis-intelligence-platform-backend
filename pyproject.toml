@@ -29,6 +29,9 @@ poc = [
     "anthropic",
     "httpx",
     "pdfplumber",
+    # Direct-Postgres bridge to the Mouhalis Legal Intel V2 Launchpad build.
+    # Enabled at runtime only when V2_DATABASE_URL is set; see platform/v2_sink.py.
+    "psycopg[binary]>=3,<4",
 ]
 dev = [
     "pytest>=8",

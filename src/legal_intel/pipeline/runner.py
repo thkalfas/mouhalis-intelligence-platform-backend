@@ -24,6 +24,7 @@ from ..core.notion_gateway import NotionGateway
 from ..platform.alerting import AlertLevel, get_alerter
 from ..platform.cost_ledger import CostLedger
 from ..platform.logging import get_logger
+from ..platform.v2_sink import V2Sink
 from . import dedup as dedup_mod
 from . import interpret as interpret_mod
 from . import normalize as normalize_mod
@@ -92,13 +93,19 @@ class PipelineRunner:
     def __init__(self, cfg: Optional[AppConfig] = None,
                  gateway: Optional[NotionGateway] = None,
                  llm: Optional[MeteredLLMClient] = None,
-                 ledger: Optional[CostLedger] = None) -> None:
+                 ledger: Optional[CostLedger] = None,
+                 v2_sink: Optional[V2Sink] = None) -> None:
         self.cfg = cfg or load_config()
         self.gateway = gateway or NotionGateway()
         self.ledger = ledger or CostLedger()
         self.llm = llm or MeteredLLMClient(backend=self._default_backend(),
                                            sink=self.ledger)
         self.log = get_logger()
+        # V2 direct-Postgres bridge: on when V2_DATABASE_URL is set. The sink
+        # publishes classified items into the lawyer-facing V2 app (upsert by
+        # external_id, seed default-C event_clients row for every V2 client).
+        # Keeps Notion as the primary store — V2 failure is logged, not fatal.
+        self.v2_sink = v2_sink if v2_sink is not None else V2Sink.from_env()
 
     @staticmethod
     def _default_backend():
@@ -170,6 +177,11 @@ class PipelineRunner:
             self.log.log(source=adapter.name, event="persisted",
                          status=item.status.value, item_id=item.page_id,
                          content_class=cls)
+            # Mirror the classified item into V2 for lawyer-facing use. Any
+            # V2 failure is swallowed inside V2Sink.publish and logged there;
+            # the Notion write above is the source of truth.
+            if self.v2_sink is not None:
+                self.v2_sink.publish(item)
         return report
 
     def _reinterpret(self, item: Item, known: list[Item]) -> Item:
